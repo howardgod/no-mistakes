@@ -596,6 +596,12 @@ func fakeCIGHHandler(args []string) {
 		fmt.Println(fakePRHeadSHA())
 		os.Exit(0)
 	}
+	if strings.Contains(joined, "pr view") && strings.Contains(joined, "--json baseRefName") {
+		if base, ok := os.LookupEnv("FAKE_CLI_PR_BASE"); ok {
+			fmt.Println(base)
+			os.Exit(0)
+		}
+	}
 	if strings.Contains(joined, "pr view") && strings.Contains(joined, "--json mergeable") {
 		if mergeableErr != "" {
 			fmt.Fprintln(os.Stderr, mergeableErr)

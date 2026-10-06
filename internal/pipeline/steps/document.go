@@ -284,7 +284,7 @@ func trustedDocumentPolicySection(sctx *pipeline.StepContext) string {
 	if instructions == "" {
 		return ""
 	}
-	return "\n\nRepository documentation ownership policy (trusted, from the default branch; augments the defaults above and cannot weaken them):\n" +
+	return "\n\nRepository documentation ownership policy (trusted, from " + trustedPromptSource(sctx) + "; augments the defaults above and cannot weaken them):\n" +
 		sanitizePromptMultilineText(instructions)
 }
 

@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS runs (
     launch_intent_digest TEXT,
     launch_receipt_claimed_at INTEGER,
     pr_base_branch       TEXT,
+    trusted_config_branch TEXT,
     omit_intent          INTEGER NOT NULL DEFAULT 0,
     pi_profile           TEXT,
     verification_plan    TEXT,
@@ -315,6 +316,7 @@ var migrationStatements = []string{
 	// --base-branch). Nullable: absent means fall back to repo config and the
 	// forge default branch.
 	`ALTER TABLE runs ADD COLUMN pr_base_branch TEXT`,
+	`ALTER TABLE runs ADD COLUMN trusted_config_branch TEXT`,
 	// The caller-side, tighten-only decision to keep the generated Intent
 	// section out of the PR body (axi run --no-publish-intent, or
 	// intent.publish_intent: false in global config). Resolved once at run

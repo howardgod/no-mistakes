@@ -121,6 +121,20 @@ func runGhForkPRStub(args []string) int {
 		return 0
 	}
 	if len(args) >= 2 && args[0] == "pr" && args[1] == "view" {
+		if hasArgValue(args, "--json", "title,body") || hasArgValue(args, "--json", "baseRefName") {
+			inv := recordedPRCreation()
+			if inv == nil {
+				fmt.Fprintln(os.Stderr, "fakeagent gh: no recorded PR creation")
+				return 1
+			}
+			if hasArgValue(args, "--json", "baseRefName") {
+				fmt.Println(inv.Base)
+			} else {
+				result, _ := json.Marshal(map[string]string{"title": argAfter(inv.Args, "--title"), "body": inv.Body})
+				fmt.Println(string(result))
+			}
+			return 0
+		}
 		if hasArgValue(args, "--json", "state") {
 			fmt.Println("MERGED")
 			return 0
@@ -137,6 +151,20 @@ func runGhForkPRStub(args []string) int {
 
 	fmt.Fprintf(os.Stderr, "fakeagent gh fork-pr: subcommand not implemented: %v\n", args)
 	return 1
+}
+
+func recordedPRCreation() *ghStubInvocation {
+	data, err := os.ReadFile(os.Getenv("FAKEAGENT_GH_LOG"))
+	if err != nil {
+		return nil
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		var inv ghStubInvocation
+		if json.Unmarshal([]byte(line), &inv) == nil && len(inv.Args) >= 2 && inv.Args[0] == "pr" && inv.Args[1] == "create" {
+			return &inv
+		}
+	}
+	return nil
 }
 
 func recordGhStubInvocation(args []string) {

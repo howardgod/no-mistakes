@@ -363,6 +363,9 @@ func (s *CIStep) Execute(sctx *pipeline.StepContext) (outcome *pipeline.StepOutc
 			return nil, readErr
 		}
 	}
+	if err := requirePinnedTrustedBase(ctx, sctx, host, pr); err != nil {
+		return nil, err
+	}
 	if strings.TrimSpace(pr.BaseBranch) != "" {
 		baseBranch = strings.TrimSpace(pr.BaseBranch)
 	}
@@ -488,6 +491,10 @@ func (s *CIStep) Execute(sctx *pipeline.StepContext) (outcome *pipeline.StepOutc
 			return timeoutOutcome()
 		}
 
+		// A mid-monitor retarget cannot inherit this run's branch-specific policy.
+		if err := requirePinnedTrustedBase(ctx, sctx, host, pr); err != nil {
+			return nil, err
+		}
 		// Check PR state (merged/closed -> exit)
 		prStateKnown := true
 		state, err := host.GetPRState(ctx, pr)
@@ -816,4 +823,27 @@ func notifyPRMerged(sctx *pipeline.StepContext) {
 		return
 	}
 	sctx.OnPRMerged(sctx.Ctx, sctx.Run.ID)
+}
+
+// requirePinnedTrustedBase stops a run whose trusted config came from an
+// operator-selected branch once its PR no longer targets that branch: the
+// policy was authorized for that one target, so a retargeted PR needs a new
+// run. Unpinned runs are untouched.
+func requirePinnedTrustedBase(ctx context.Context, sctx *pipeline.StepContext, host scm.Host, pr *scm.PR) error {
+	if sctx.Run.TrustedConfigBranch == nil {
+		return nil
+	}
+	pinned := *sctx.Run.TrustedConfigBranch
+	reader, ok := host.(scm.PRBaseBranchReader)
+	if !ok {
+		return fmt.Errorf("provider cannot read the live PR base, so a run pinned to trusted config branch %q cannot verify its target", pinned)
+	}
+	actual, err := reader.GetPRBaseBranch(ctx, pr)
+	if err != nil {
+		return fmt.Errorf("read live PR base for trusted config branch %q: %w", pinned, err)
+	}
+	if strings.TrimSpace(actual) != pinned {
+		return fmt.Errorf("live PR base %q differs from pinned trusted config branch %q; start a new run for the new target", strings.TrimSpace(actual), pinned)
+	}
+	return nil
 }

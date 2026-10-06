@@ -62,7 +62,7 @@ func loadPRTemplate(ctx context.Context, dir, sha, name string) (string, error) 
 		return "", err
 	}
 	if (len(sha) != 40 && len(sha) != 64) || !isHexObjectID(sha) {
-		return "", fmt.Errorf("pr.template requires a pinned trusted default-branch commit")
+		return "", fmt.Errorf("pr.template requires a pinned trusted source commit")
 	}
 	entry, err := git.RunRaw(ctx, dir, "ls-tree", "-z", sha, "--", ":(literal)"+name)
 	if err != nil {

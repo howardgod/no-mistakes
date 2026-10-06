@@ -463,6 +463,11 @@ func TestReviewPathInstructionsSectionStaysWithinAccountedBytes(t *testing.T) {
 	if len(section) > accounted {
 		t.Fatalf("section is %d bytes but the config accounting allowed %d; the cap no longer bounds the prompt", len(section), accounted)
 	}
+	// An operator-selected trusted source renames the heading's provenance; the
+	// accounting above must still measure that section exactly as well.
+	if alternate := reviewPathInstructionsSection(alternateSourcePathInstructionsHeading, matches); len(alternate) != len(section) || alternate == section {
+		t.Fatalf("alternate-source section is %d bytes (changed=%v), want the same %d bytes with a different provenance", len(alternate), alternate != section, len(section))
+	}
 
 	// A single entry with a single short file is the tight case: the accounting
 	// may only exceed the real section by the unused matched-file allowance.

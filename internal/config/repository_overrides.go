@@ -5,6 +5,8 @@ import (
 	"net"
 	"net/url"
 	"strings"
+
+	"github.com/kunchenguid/no-mistakes/internal/evidence"
 )
 
 func normalizeRepositoryOverrides(raw RepositoryOverrides) (RepositoryOverrides, error) {
@@ -28,9 +30,46 @@ func normalizeRepositoryOverrides(raw RepositoryOverrides) (RepositoryOverrides,
 				return nil, fmt.Errorf("invalid repository_overrides.%s.pr: %w", key, err)
 			}
 		}
+		seen := make(map[string]bool, len(override.TrustedConfigBranches))
+		for _, branch := range override.TrustedConfigBranches {
+			if branch == "" || branch != strings.TrimSpace(branch) {
+				return nil, fmt.Errorf("invalid repository_overrides.%s.trusted_config_branches: branch must not be empty or padded", key)
+			}
+			if _, err := evidence.NormalizeBranch(branch); err != nil {
+				return nil, fmt.Errorf("invalid repository_overrides.%s.trusted_config_branches: %w", key, err)
+			}
+			if seen[branch] {
+				return nil, fmt.Errorf("invalid repository_overrides.%s.trusted_config_branches: duplicate branch %q", key, branch)
+			}
+			seen[branch] = true
+		}
 		overrides[key] = override
 	}
 	return overrides, nil
+}
+
+// TrustedConfigBranch returns an operator-authorized source only for an explicit
+// per-run base. A pushed repository config never participates in this decision.
+func (g *GlobalConfig) TrustedConfigBranch(remote, explicitBase, defaultBranch string) string {
+	if g == nil || explicitBase == "" || explicitBase == defaultBranch {
+		return ""
+	}
+	key, err := normalizeRepositoryRemote(remote)
+	if err != nil {
+		return ""
+	}
+	for _, branch := range g.RepositoryOverrides[key].TrustedConfigBranches {
+		if branch == explicitBase {
+			return branch
+		}
+	}
+	return ""
+}
+
+// TrustedConfigBranchAllowed checks whether a previously pinned source is still
+// authorized. A revoked override must not silently revert recovery to default.
+func (g *GlobalConfig) TrustedConfigBranchAllowed(remote, branch string) bool {
+	return g.TrustedConfigBranch(remote, branch, "") == branch
 }
 
 // normalizeRepositoryRemote identifies a Git remote by host and repository path,

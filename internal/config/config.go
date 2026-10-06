@@ -315,6 +315,9 @@ type RepositoryOverride struct {
 	Commands map[string]CommandOverride `yaml:"commands"`
 	Review   OperatorReviewRaw          `yaml:"review"`
 	Document DocumentRaw                `yaml:"document"`
+	// TrustedConfigBranches names exact branches an explicit --base-branch run
+	// may use as its trusted config source instead of the default branch.
+	TrustedConfigBranches []string `yaml:"trusted_config_branches"`
 }
 
 // OperatorReviewRaw is the review block the operator's global config may set,
@@ -752,6 +755,7 @@ type Config struct {
 	ReplayGlobalYAML          []byte
 	ReplayRepoYAML            []byte
 	TrustedConfigSHA          string
+	TrustedConfigBranch       string
 	CaptureEvalProvenance     bool
 	Agent                     types.AgentName
 	Agents                    []types.AgentName

@@ -456,7 +456,7 @@ func trustedTestInstructionsSection(sctx *pipeline.StepContext) string {
 	if instructions == "" {
 		return ""
 	}
-	return "\nRepository live-validation runbook (trusted, from the default branch):\n" +
+	return "\nRepository live-validation runbook (trusted, from " + trustedPromptSource(sctx) + "):\n" +
 		sanitizePromptMultilineText(instructions) + "\n"
 }
 
