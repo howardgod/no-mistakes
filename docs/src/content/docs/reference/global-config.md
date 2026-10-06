@@ -896,7 +896,7 @@ ci:
 ```
 
 Each rerun is another provider-side workflow run billed to the repository being contributed to.
-Set `0` here to never spend someone else's CI minutes; this is the only place to make that choice for a repository whose default branch you do not control.
+Set `0` here to never spend someone else's CI minutes; this is the only place to make that choice for a repository whose trusted config branch you do not control.
 
 The per-repo [`ci.rerun_transient`](/no-mistakes/reference/repo-config/#cirerun_transient) overrides this value and owns the classification, the trust boundary, and every case that skips the rerun.
 
