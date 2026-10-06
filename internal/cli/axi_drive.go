@@ -1256,7 +1256,7 @@ func renderDriveResult(cmd *cobra.Command, run *ipc.RunInfo, ciReady bool, lead 
 		fields = append(fields, toon.Field{Key: "outcome", Value: "checks-passed"})
 		merge := "CI checks passed - the PR is ready. Ask the user to review and merge it."
 		if activity.DeclaredNoCI {
-			merge = "Repository declares no CI (no_ci: true on the trusted default branch) and no checks are registered - treated as all checks passed. Ask the user to review and merge it."
+			merge = "Repository declares no CI (no_ci: true on the trusted config branch) and no checks are registered - treated as all checks passed. Ask the user to review and merge it."
 		}
 		if rv.PRURL != "" {
 			merge = fmt.Sprintf("%s: %s", strings.TrimSuffix(merge, "."), rv.PRURL)

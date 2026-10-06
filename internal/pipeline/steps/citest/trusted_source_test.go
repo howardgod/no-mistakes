@@ -87,8 +87,9 @@ func TestCIStep_PinnedTrustedSourceRetargetFailsARefusalRetry(t *testing.T) {
 
 // A failed live-base read during polling is one unverified poll, like every
 // other monitor read: it neither fails the run nor lets that poll mark the PR
-// ready or exit merged. The fake gh answers the base reads in order, the first
-// being the step's own pre-monitor read.
+// ready or exit merged, and a read that keeps failing parks for a decision
+// instead of spinning. The fake gh answers the base reads in order, the first
+// being the step's own pre-monitor read, and repeats the last answer.
 func TestCIStep_PinnedTrustedSourceToleratesATransientBaseReadWhilePolling(t *testing.T) {
 	const passing = `[{"name":"build","state":"SUCCESS","bucket":"pass"}]`
 	for _, tc := range []struct {
@@ -97,6 +98,7 @@ func TestCIStep_PinnedTrustedSourceToleratesATransientBaseReadWhilePolling(t *te
 		bases []string
 		// cancelAfter cancels the step at that wait; 0 lets it run to its own exit.
 		cancelAfter int
+		wantPark    bool
 		wantWaits   int
 		wantReady   []bool
 	}{
@@ -114,6 +116,14 @@ func TestCIStep_PinnedTrustedSourceToleratesATransientBaseReadWhilePolling(t *te
 			cancelAfter: 2,
 			wantWaits:   2,
 			wantReady:   []bool{true, false},
+		},
+		{
+			name:      "every_polled_read_failing_parks_for_a_decision",
+			state:     "OPEN",
+			bases:     []string{"verify", "!HTTP 401: bad credentials"},
+			wantPark:  true,
+			wantWaits: 5,
+			wantReady: []bool{false, false, false, false, false, false},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -146,7 +156,11 @@ func TestCIStep_PinnedTrustedSourceToleratesATransientBaseReadWhilePolling(t *te
 				return nil
 			})
 			outcome, err := step.Execute(sctx)
-			if tc.cancelAfter > 0 {
+			if tc.wantPark {
+				if err != nil || outcome == nil || !outcome.NeedsApproval || !strings.Contains(outcome.Findings, `live PR base for trusted config branch \"verify\"`) {
+					t.Fatalf("outcome = %#v, err = %v; want a park naming the unreadable live PR base", outcome, err)
+				}
+			} else if tc.cancelAfter > 0 {
 				if !errors.Is(err, context.Canceled) {
 					t.Fatalf("err = %v, want the monitor still polling after the failed base read", err)
 				}

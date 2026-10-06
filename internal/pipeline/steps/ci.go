@@ -424,6 +424,7 @@ func (s *CIStep) Execute(sctx *pipeline.StepContext) (outcome *pipeline.StepOutc
 	timeoutMergeConflict := false
 	lastMonitorLog := ""
 	consecutiveCheckErrs := 0
+	consecutiveBaseReadErrs := 0
 	timeoutOutcome := func() (*pipeline.StepOutcome, error) {
 		sctx.Log("CI timeout reached")
 		var outcome *pipeline.StepOutcome
@@ -504,11 +505,18 @@ func (s *CIStep) Execute(sctx *pipeline.StepContext) (outcome *pipeline.StepOutc
 				clearCIMonitorReady(sctx)
 				lastMonitorLog = ""
 				sctx.Log(fmt.Sprintf("warning: could not verify the live PR base: %v", readErr))
+				consecutiveBaseReadErrs++
+				if consecutiveBaseReadErrs >= consecutiveCheckErrorLimit {
+					sctx.Log(fmt.Sprintf("live PR base could not be read %d consecutive times, parking for a decision", consecutiveBaseReadErrs))
+					baseErr := fmt.Errorf("live PR base for trusted config branch %q: %w", *sctx.Run.TrustedConfigBranch, readErr)
+					return ciTerminalRepairOutcome(ciCheckReadFailureOutcome(baseErr), Findings{}, sctx.DeferredFindings), nil
+				}
 				if err := waitForPoll(); err != nil {
 					return nil, err
 				}
 				continue
 			}
+			consecutiveBaseReadErrs = 0
 			if err := requirePinnedTrustedBase(sctx, host, actual, readErr); err != nil {
 				clearCIMonitorReady(sctx)
 				return nil, err
