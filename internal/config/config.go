@@ -1468,7 +1468,7 @@ auto_fix:
 # Raise this only for repositories whose cancellations are known to be
 # provider-side. Each rerun is another workflow run billed to the repository
 # being contributed to. A repository that sets ci.rerun_transient on its own
-# default branch overrides this value.
+# trusted config branch overrides this value.
 ci:
   rerun_transient: 0
   # Whether EVERY CI repair must re-pass the whole pipeline before it is
@@ -1480,7 +1480,7 @@ ci:
   # repair always does, because rebasing rewrites the head. Set true to restart
   # validation at Review for every repair - safer, and it pays for another full
   # pipeline pass in wall clock and tokens every time CI is repaired. A
-  # repository that sets ci.revalidate_repairs on its own default branch
+  # repository that sets ci.revalidate_repairs on its own trusted config branch
   # overrides this value.
   revalidate_repairs: false
 

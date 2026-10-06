@@ -314,7 +314,9 @@ responsibility; no-mistakes does not inspect subscriptions or query quotas.
 A pin applies to **every pipeline duty**, including reviewer and fixer roles.
 The effective trusted agent selection must be Pi-only (no `auto`, non-Pi
 fallbacks, or non-Pi `review_agents`), including `agent` / fallbacks from the
-trusted default-branch `.no-mistakes.yaml`. That check runs before any active
+trusted config branch's `.no-mistakes.yaml` (the default branch, unless the run
+is pinned to an operator-opted-in branch; see the
+[repo config security note](/no-mistakes/reference/repo-config/)). That check runs before any active
 validation is cancelled. Pi role-specific model/effort values are
 superseded by the run pin. Native `--model`, `--provider`, `--models`,
 `--thinking` (including `--flag=value`), or `--` in
@@ -1267,7 +1269,7 @@ Reaping runs after each finished run and again at daemon startup. An upgraded da
 
 `local_root` must be an absolute path outside `<NM_HOME>/worktrees`; a relative or managed-worktree path fails daemon startup and prevents new or recovered runs from starting. Because `retention` bounds how long a PR body's local artifact links keep resolving, raise it rather than lowering it if your reviews run long.
 
-The publication fields are global defaults. Repo config can override `store_in_repo`, `attach_media`, and `dir`; it can override `branch` only through the trusted default-branch copy. `local_root`, `retention`, and `max_runs` are global-only: a repository does not get to name a filesystem path this machine's daemon writes to, or set the retention budget for a directory every repository on the machine shares.
+The publication fields are global defaults. Repo config can override `store_in_repo`, `attach_media`, and `dir`; it can override `branch` only through the trusted config branch copy. `local_root`, `retention`, and `max_runs` are global-only: a repository does not get to name a filesystem path this machine's daemon writes to, or set the retention budget for a directory every repository on the machine shares.
 
 `test.evidence.retention` and `test.evidence.max_runs` also bound `<NM_HOME>/logs/<run-id>` (per-run step logs), reaped on the same cadence rather than through a second config surface for the same kind of per-run diagnostic artifact.
 
