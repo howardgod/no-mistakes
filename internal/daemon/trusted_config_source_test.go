@@ -83,7 +83,7 @@ func TestResolveTrustedSource_MissingBranchNeverReadsItsStaleTrackingRef(t *test
 		if err == nil || sha != "" || cfg != nil {
 			t.Fatalf("mode %d: sha=%q cfg=%+v err=%v; want a refusal, not the stale tracking ref or main", mode, sha, cfg, err)
 		}
-		if !strings.Contains(err.Error(), `failed to fetch trusted source branch "verify"`) {
+		if !strings.Contains(err.Error(), `failed to fetch trusted config source branch "verify"`) {
 			t.Fatalf("mode %d: error does not name the source branch: %v", mode, err)
 		}
 		gitCmd(t, bare, "update-ref", "refs/heads/verify", "refs/remotes/origin/verify")

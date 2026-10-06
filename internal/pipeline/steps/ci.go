@@ -336,6 +336,27 @@ func (s *CIStep) Execute(sctx *pipeline.StepContext) (outcome *pipeline.StepOutc
 		return nil, fmt.Errorf("extract PR number: %w", err)
 	}
 	pr := &scm.PR{Number: prNumber, URL: prURL}
+	// A resumed run may have a different trusted configuration than the run
+	// that created this PR. Re-read the forge record without a base filter so
+	// conflict repair and tip monitoring follow the PR's actual target.
+	var baseReadErr error
+	if reader, ok := host.(scm.PRBaseBranchReader); ok {
+		actual, readErr := reader.GetPRBaseBranch(ctx, pr)
+		if readErr == nil {
+			pr.BaseBranch = actual
+		} else if pluginContractBroken(readErr) {
+			// A one-time read, not a poll: even a timeout fails closed,
+			// since falling back to the configured base could monitor or
+			// repair against a target the PR no longer has.
+			return nil, readErr
+		}
+		baseReadErr = readErr
+	}
+	if err := requirePinnedTrustedBase(sctx, host, pr.BaseBranch, baseReadErr); err != nil {
+		retryRefusal = false
+		clearCIMonitorReady(sctx)
+		return nil, err
+	}
 	if retryRefusal {
 		if err := setCIMonitorReadiness(sctx, false, false); err != nil {
 			return nil, err
@@ -350,22 +371,6 @@ func (s *CIStep) Execute(sctx *pipeline.StepContext) (outcome *pipeline.StepOutc
 		}
 	}
 	baseBranch := effectivePRBaseBranch(sctx)
-	// A resumed run may have a different trusted configuration than the run
-	// that created this PR. Re-read the forge record without a base filter so
-	// conflict repair and tip monitoring follow the PR's actual target.
-	if reader, ok := host.(scm.PRBaseBranchReader); ok {
-		if actual, readErr := reader.GetPRBaseBranch(ctx, pr); readErr == nil {
-			pr.BaseBranch = actual
-		} else if pluginContractBroken(readErr) {
-			// A one-time read, not a poll: even a timeout fails closed,
-			// since falling back to the configured base could monitor or
-			// repair against a target the PR no longer has.
-			return nil, readErr
-		}
-	}
-	if err := requirePinnedTrustedBase(ctx, sctx, host, pr); err != nil {
-		return nil, err
-	}
 	if strings.TrimSpace(pr.BaseBranch) != "" {
 		baseBranch = strings.TrimSpace(pr.BaseBranch)
 	}
@@ -492,8 +497,22 @@ func (s *CIStep) Execute(sctx *pipeline.StepContext) (outcome *pipeline.StepOutc
 		}
 
 		// A mid-monitor retarget cannot inherit this run's branch-specific policy.
-		if err := requirePinnedTrustedBase(ctx, sctx, host, pr); err != nil {
-			return nil, err
+		if reader, ok := host.(scm.PRBaseBranchReader); ok && sctx.Run.TrustedConfigBranch != nil {
+			actual, readErr := reader.GetPRBaseBranch(ctx, pr)
+			if readErr != nil && !pluginPollFailsStep(readErr) {
+				// An unverified base may not mark the PR ready or exit merged.
+				clearCIMonitorReady(sctx)
+				lastMonitorLog = ""
+				sctx.Log(fmt.Sprintf("warning: could not verify the live PR base: %v", readErr))
+				if err := waitForPoll(); err != nil {
+					return nil, err
+				}
+				continue
+			}
+			if err := requirePinnedTrustedBase(sctx, host, actual, readErr); err != nil {
+				clearCIMonitorReady(sctx)
+				return nil, err
+			}
 		}
 		// Check PR state (merged/closed -> exit)
 		prStateKnown := true
@@ -829,18 +848,16 @@ func notifyPRMerged(sctx *pipeline.StepContext) {
 // operator-selected branch once its PR no longer targets that branch: the
 // policy was authorized for that one target, so a retargeted PR needs a new
 // run. Unpinned runs are untouched.
-func requirePinnedTrustedBase(ctx context.Context, sctx *pipeline.StepContext, host scm.Host, pr *scm.PR) error {
+func requirePinnedTrustedBase(sctx *pipeline.StepContext, host scm.Host, actual string, readErr error) error {
 	if sctx.Run.TrustedConfigBranch == nil {
 		return nil
 	}
 	pinned := *sctx.Run.TrustedConfigBranch
-	reader, ok := host.(scm.PRBaseBranchReader)
-	if !ok {
+	if _, ok := host.(scm.PRBaseBranchReader); !ok {
 		return fmt.Errorf("provider cannot read the live PR base, so a run pinned to trusted config branch %q cannot verify its target", pinned)
 	}
-	actual, err := reader.GetPRBaseBranch(ctx, pr)
-	if err != nil {
-		return fmt.Errorf("read live PR base for trusted config branch %q: %w", pinned, err)
+	if readErr != nil {
+		return fmt.Errorf("read live PR base for trusted config branch %q: %w", pinned, readErr)
 	}
 	if strings.TrimSpace(actual) != pinned {
 		return fmt.Errorf("live PR base %q differs from pinned trusted config branch %q; start a new run for the new target", strings.TrimSpace(actual), pinned)

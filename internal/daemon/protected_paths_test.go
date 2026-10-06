@@ -220,7 +220,7 @@ func TestProtectedPathRefusalSurvivesFailedTrustedRecovery(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := mgr.prepareRecoveredRun(context.Background(), run); err == nil || !strings.Contains(err.Error(), "disable_project_settings") {
+			if _, err := mgr.prepareRecoveredRun(context.Background(), run); err == nil || !strings.Contains(err.Error(), "failed to fetch trusted config source branch") {
 				t.Fatalf("recovery must fail closed at trusted config: %v", err)
 			}
 			layout, err := validatedWorktreeLayout(database, p, config.DefaultGlobalConfig())

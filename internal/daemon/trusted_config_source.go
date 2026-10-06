@@ -73,11 +73,11 @@ func resolveTrustedSource(ctx context.Context, dir string, repo *db.Repo, branch
 		err = git.FetchRemoteBranch(ctx, dir, "origin", branch)
 	}
 	if err != nil {
-		return "", nil, fmt.Errorf("cannot evaluate disable_project_settings: failed to fetch trusted source branch %q (refusing to run without reading the trusted config): %w", branch, err)
+		return "", nil, fmt.Errorf("failed to fetch trusted config source branch %q (refusing to run without reading the trusted config): %w", branch, err)
 	}
 	sha, err := git.ResolveRef(ctx, dir, ref)
 	if err != nil {
-		return "", nil, fmt.Errorf("cannot evaluate disable_project_settings: failed to resolve trusted source branch %q: %w", branch, err)
+		return "", nil, fmt.Errorf("failed to resolve trusted config source branch %q: %w", branch, err)
 	}
 	if err := assertGateTrustedConfigReadable(ctx, dir, branch, sha); err != nil {
 		return "", nil, err
