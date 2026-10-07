@@ -525,6 +525,8 @@ gates:
 
 A gate runs its command in the run worktree through the platform shell, `sh -c` on POSIX or `cmd.exe /c` on Windows, and passes on exit code 0. Gate commands report through their exit code and combined output; there is no structured findings-file protocol. Agent gates are not supported. An entry with `instructions` fails config parsing so it cannot be mistaken for a command gate.
 
+Gate commands receive `NO_MISTAKES_TRUSTED_CONFIG_BRANCH`, the branch name of the run's resolved trusted config source (for example, `verify` for an authorized explicit `--base-branch verify` run, or the repository's registered default branch for an ordinary run). It is not the pushed branch or the PR's live base. A gate that runs a script from that source can use `B=origin/${NO_MISTAKES_TRUSTED_CONFIG_BRANCH:-master}` on POSIX, with `master` as its fallback default branch. This variable is set only for gate commands, including a re-check after an authorized fix; it is not passed to agent processes or other pipeline steps.
+
 #### Placement
 
 `after` names the core step the gate runs immediately after. Valid anchors are `rebase`, `review`, `test`, `document`, and `lint`.

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -310,7 +311,15 @@ func trustedSourceFixtureConfig(marker, prBase string) string {
 	if prBase != "" {
 		pr += "  base_branch: " + prBase + "\n"
 	}
-	return fmt.Sprintf("allow_repo_commands: false\nreview:\n  path_instructions:\n    - path: '*.txt'\n      instructions: '%s REVIEW RULE'\n%sgates:\n  - name: %s\n    after: lint\n    command: 'echo %s-gate'\n", strings.ToUpper(marker), pr, marker, marker)
+	branch := "main"
+	if marker == "verify" || marker == "verify2" {
+		branch = "verify"
+	}
+	command := `echo trusted-config-source=$NO_MISTAKES_TRUSTED_CONFIG_BRANCH; test "$NO_MISTAKES_TRUSTED_CONFIG_BRANCH" = "` + branch + `"`
+	if runtime.GOOS == "windows" {
+		command = `echo trusted-config-source=%NO_MISTAKES_TRUSTED_CONFIG_BRANCH% & if not "%NO_MISTAKES_TRUSTED_CONFIG_BRANCH%" == "` + branch + `" exit /b 1`
+	}
+	return fmt.Sprintf("allow_repo_commands: false\nreview:\n  path_instructions:\n    - path: '*.txt'\n      instructions: '%s REVIEW RULE'\n%sgates:\n  - name: %s\n    after: lint\n    command: '%s'\n", strings.ToUpper(marker), pr, marker, command)
 }
 
 // crashAndRestartDaemon kills the daemon without a graceful stop, which is the

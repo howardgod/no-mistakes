@@ -96,7 +96,8 @@ Previous gate findings to address:
 func (s *CustomGateStep) executeCommand(sctx *pipeline.StepContext, fixSummary string) (*pipeline.StepOutcome, error) {
 	command := strings.TrimSpace(s.Gate.Command)
 	sctx.Log(fmt.Sprintf("running gate %q: %s", s.Gate.Name, command))
-	output, exitCode, err := runStepShellCommand(sctx, command)
+	env := append(stepEnvironment(sctx), "NO_MISTAKES_TRUSTED_CONFIG_BRANCH="+sctx.Config.TrustedConfigBranch)
+	output, exitCode, err := runShellCommandWithEnv(sctx.Ctx, sctx.WorkDir, env, command)
 	if err != nil {
 		logConfiguredCommandOutput(sctx, output, s.Name())
 		return nil, fmt.Errorf("run gate %q command: %w", s.Gate.Name, err)

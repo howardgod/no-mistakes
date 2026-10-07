@@ -1,0 +1,28 @@
+=== RUN   TestMakeBuildIgnoresUnrelatedDotEnvEntries
+--- PASS: TestMakeBuildIgnoresUnrelatedDotEnvEntries (0.08s)
+PASS
+ok  	github.com/kunchenguid/no-mistakes	1.104s
+=== RUN   TestPushReceivedSkipStepsConfiguresExecutor
+2026/10/07 11:25:07 INFO daemon process launched pid=1934884
+2026/10/07 11:25:07 INFO daemon startup phase complete phase=orphan_servers duration_ms=0
+2026/10/07 11:25:07 INFO daemon startup phase complete phase=gate_migration duration_ms=0 gate_count=0 current=0 migrated=0 rejected=0 failed=0
+2026/10/07 11:25:07 INFO daemon startup phase complete phase=terminal_pr_runs duration_ms=0 reconciled=0
+2026/10/07 11:25:07 INFO daemon startup phase complete phase=parked_runs duration_ms=1 preserved=0
+2026/10/07 11:25:07 INFO daemon startup phase complete phase=stale_runs duration_ms=3 recovered=0
+2026/10/07 11:25:07 INFO daemon startup phase complete phase=orphan_processes duration_ms=6
+2026/10/07 11:25:07 INFO daemon startup phase complete phase=worktree_cleanup duration_ms=0
+2026/10/07 11:25:07 INFO daemon startup phase complete phase=evidence_cleanup duration_ms=0
+2026/10/07 11:25:07 INFO daemon startup phase complete phase=ipc_bind duration_ms=1
+2026/10/07 11:25:07 INFO daemon startup phase complete phase=ipc_health duration_ms=3
+2026/10/07 11:25:07 INFO daemon ready socket=/tmp/dtest1411090288/socket pid=1934884 startup_ms=28
+2026/10/07 11:25:07 INFO push received ref=refs/heads/main old=0000000000000000000000000000000000000000 new=0905a5672bc03bb2df26761033e78aedea2e6e63 gate=/tmp/dtest1411090288/repos/skip-run-repo.git
+2026/10/07 11:25:07 WARN repository URL refresh skipped; continuing with existing registration repo_id=skip-run-repo reason=remote_unreadable
+2026/10/07 11:25:07 INFO ipc request method=push_received
+2026/10/07 11:25:07 INFO pipeline completed run_id=01M4A69EA85HB1D8D228388GFR
+2026/10/07 11:25:07 INFO shutting down reason="ipc request"
+2026/10/07 11:25:07 INFO ipc request method=shutdown
+2026/10/07 11:25:07 INFO cancelled run on shutdown run_id=01M4A69EA85HB1D8D228388GFR
+2026/10/07 11:25:07 INFO daemon stopped
+--- PASS: TestPushReceivedSkipStepsConfiguresExecutor (0.56s)
+PASS
+ok  	github.com/kunchenguid/no-mistakes/internal/daemon	1.578s
