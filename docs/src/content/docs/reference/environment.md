@@ -228,6 +228,17 @@ Kill-switch injected into every pipeline agent subprocess so compact-adviser sta
 
 no-mistakes stamps `COMPACT_ADVISER_DISABLE=1` onto every spawned gate agent, including ACP aliases and managed agent servers that can load host plugins. Forge and profile overlays cannot drop the flag. The daemon process itself is unchanged; this is agent-child policy only, not a user-facing knob for the service environment.
 
+## `NO_MISTAKES_TRUSTED_CONFIG_BRANCH`
+
+Branch name of the run's resolved trusted config source, injected into every [repository gate](/no-mistakes/reference/repo-config/#gates) command.
+
+|         |                                         |
+| ------- | --------------------------------------- |
+| Type    | branch name                             |
+| Default | injected; only for gate commands        |
+
+The value is `verify` for an authorized explicit `--base-branch verify` run (see [`repository_overrides.trusted_config_branches`](/no-mistakes/reference/global-config/#trusted-config-source-branches)), and the repository's registered default branch for an ordinary run. It is not the pushed branch or the PR's live base. A gate that runs a script from that source can use `B=origin/${NO_MISTAKES_TRUSTED_CONFIG_BRANCH:-master}` on POSIX, with `master` as its fallback default branch. The variable is set for every gate command run, including the re-check after an authorized fix; variables the run's forge profile removes stay removed. It is not passed to agent processes or other pipeline steps.
+
 ## `NO_MISTAKES_UMAMI_HOST`
 
 Override the telemetry collection host.
