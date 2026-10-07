@@ -525,6 +525,8 @@ gates:
 
 A gate runs its command in the run worktree through the platform shell, `sh -c` on POSIX or `cmd.exe /c` on Windows, and passes on exit code 0. Gate commands report through their exit code and combined output; there is no structured findings-file protocol. Agent gates are not supported. An entry with `instructions` fails config parsing so it cannot be mistaken for a command gate.
 
+Gate commands receive [`NO_MISTAKES_TRUSTED_CONFIG_BRANCH`](/no-mistakes/reference/environment/#no_mistakes_trusted_config_branch), the branch name of the run's trusted config source, so one `.no-mistakes.yaml` can read that branch's scripts without hard-coding its name.
+
 #### Placement
 
 `after` names the core step the gate runs immediately after. Valid anchors are `rebase`, `review`, `test`, `document`, and `lint`.
