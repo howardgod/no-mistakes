@@ -12,7 +12,9 @@ import (
 	"github.com/kunchenguid/no-mistakes/internal/agent"
 	"github.com/kunchenguid/no-mistakes/internal/config"
 	"github.com/kunchenguid/no-mistakes/internal/db"
+	"github.com/kunchenguid/no-mistakes/internal/forgecontext"
 	"github.com/kunchenguid/no-mistakes/internal/pipeline"
+	"github.com/kunchenguid/no-mistakes/internal/runenv"
 	"github.com/kunchenguid/no-mistakes/internal/types"
 )
 
@@ -68,6 +70,29 @@ func TestCustomGateStep_CommandPassRunsClean(t *testing.T) {
 	}
 	if outcome.NeedsApproval || outcome.ExitCode != 0 || outcome.Findings != "" {
 		t.Fatalf("outcome = %+v, want a clean pass", outcome)
+	}
+}
+
+// A gate learns the run's trusted config branch, and adding that variable must
+// not bring back daemon credentials the run's forge profile removed.
+func TestCustomGateStep_CommandSeesTrustedConfigBranchWithoutUnsetCredentials(t *testing.T) {
+	t.Setenv("GH_TOKEN", "daemon-ambient-token")
+	dir, baseSHA, headSHA := setupGitRepo(t)
+	sctx := newTestContext(t, &mockAgent{name: "mock"}, dir, baseSHA, headSHA, config.Commands{})
+	sctx.Config.TrustedConfigBranch = "verify"
+	sctx.ForgeContext = &forgecontext.Context{Environment: runenv.Overlay{Unset: []string{"GH_TOKEN"}}}
+
+	command := `test -z "${GH_TOKEN+set}" || exit 5; test "$NO_MISTAKES_TRUSTED_CONFIG_BRANCH" = verify || exit 6`
+	if runtime.GOOS == "windows" {
+		command = `if defined GH_TOKEN (exit /b 5) else if not "%NO_MISTAKES_TRUSTED_CONFIG_BRANCH%"=="verify" (exit /b 6)`
+	}
+	step := &CustomGateStep{Gate: config.Gate{Name: "trusted-source", After: types.StepTest, Command: command}}
+	outcome, err := step.Execute(sctx)
+	if err != nil {
+		t.Fatalf("Execute() = %v", err)
+	}
+	if outcome.NeedsApproval || outcome.ExitCode != 0 {
+		t.Fatalf("outcome = %+v, want a clean pass (exit 5: GH_TOKEN came back, exit 6: wrong trusted branch)", outcome)
 	}
 }
 

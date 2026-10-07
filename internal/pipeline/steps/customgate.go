@@ -7,6 +7,7 @@ import (
 
 	"github.com/kunchenguid/no-mistakes/internal/config"
 	"github.com/kunchenguid/no-mistakes/internal/pipeline"
+	"github.com/kunchenguid/no-mistakes/internal/runenv"
 	"github.com/kunchenguid/no-mistakes/internal/types"
 )
 
@@ -96,8 +97,8 @@ Previous gate findings to address:
 func (s *CustomGateStep) executeCommand(sctx *pipeline.StepContext, fixSummary string) (*pipeline.StepOutcome, error) {
 	command := strings.TrimSpace(s.Gate.Command)
 	sctx.Log(fmt.Sprintf("running gate %q: %s", s.Gate.Name, command))
-	env := append(stepEnvironment(sctx), "NO_MISTAKES_TRUSTED_CONFIG_BRANCH="+sctx.Config.TrustedConfigBranch)
-	output, exitCode, err := runShellCommandWithEnv(sctx.Ctx, sctx.WorkDir, env, command)
+	env := runenv.Overlay{Set: map[string]string{"NO_MISTAKES_TRUSTED_CONFIG_BRANCH": sctx.Config.TrustedConfigBranch}}.Apply(stepEnvironment(sctx))
+	output, exitCode, err := runShellCommandWithProcessEnv(sctx.Ctx, sctx.WorkDir, env, command)
 	if err != nil {
 		logConfiguredCommandOutput(sctx, output, s.Name())
 		return nil, fmt.Errorf("run gate %q command: %w", s.Gate.Name, err)
