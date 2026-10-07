@@ -12,9 +12,9 @@ verdict on the whole round, not an answer to the question that was asked.
 The review conversation is **opt-in and off by default**. A repository asks for
 it with trusted
 [`review.conversation: true`](/no-mistakes/reference/repo-config/#reviewconversation)
-on its default branch; without that, everything on this page is inert and the
+on its trusted config branch (the default branch, unless the run is pinned to an operator-opted-in branch; see the [repo config security note](/no-mistakes/reference/repo-config/)); without that, everything on this page is inert and the
 review step behaves exactly as the paragraph above describes. The setting is
-read only from the trusted default-branch copy, in both directions: a pushed
+read only from the trusted config branch copy, in both directions: a pushed
 branch cannot make its own review park for a human answer, and it cannot
 decline a conversation the maintainer asked for.
 
@@ -426,8 +426,8 @@ created, and the PR body publishes what it published before the feature existed.
 A repository that never opted in is byte-for-byte upstream.
 
 *May a conversation that already EXISTS be read and answered?* is keyed on the
-files being on disk. The setting is trusted-default-branch-only and is
-re-resolved on recovery from the current default-branch tip, so a maintainer who
+files being on disk. The setting is trusted-config-branch-only and is
+re-resolved on recovery from the current trusted config branch tip, so a maintainer who
 turns it off - or a trusted-config fetch that fails, which recovery resolves the
 same way - between the ask and the answer would otherwise make those questions
 permanently unanswerable.

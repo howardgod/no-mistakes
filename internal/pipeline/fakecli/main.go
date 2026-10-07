@@ -596,6 +596,15 @@ func fakeCIGHHandler(args []string) {
 		fmt.Println(fakePRHeadSHA())
 		os.Exit(0)
 	}
+	if strings.Contains(joined, "pr view") && strings.Contains(joined, "--json baseRefName") {
+		if path := os.Getenv("FAKE_CLI_PR_BASE_SEQ_PATH"); path != "" {
+			printFakePRBaseFromSequence(path)
+		}
+		if base, ok := os.LookupEnv("FAKE_CLI_PR_BASE"); ok {
+			fmt.Println(base)
+			os.Exit(0)
+		}
+	}
 	if strings.Contains(joined, "pr view") && strings.Contains(joined, "--json mergeable") {
 		if mergeableErr != "" {
 			fmt.Fprintln(os.Stderr, mergeableErr)
@@ -660,6 +669,30 @@ func fakeCIGHRerun() {
 		fmt.Fprintln(os.Stderr, rerunErr)
 		os.Exit(1)
 	}
+	os.Exit(0)
+}
+
+// printFakePRBaseFromSequence answers one live-base read per call from a line
+// file: each call consumes the first line until one remains, and a line
+// starting with "!" fails the read with the rest of the line as its error.
+func printFakePRBaseFromSequence(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) > 1 {
+		if err := os.WriteFile(path, []byte(strings.Join(lines[1:], "\n")), 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+	if message, failed := strings.CutPrefix(lines[0], "!"); failed {
+		fmt.Fprintln(os.Stderr, message)
+		os.Exit(1)
+	}
+	fmt.Println(lines[0])
 	os.Exit(0)
 }
 

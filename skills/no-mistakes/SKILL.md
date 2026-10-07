@@ -239,7 +239,7 @@ Run the pipeline and decide on its findings as they come up:
 3. Repeat step 2 until the output has an `outcome:` instead of a `gate:`. The
    outcomes are:
    - `checks-passed` - the change is validated and CI is green (or the
-     trusted default-branch config declares `no_ci: true` and no checks are
+     trusted config branch declares `no_ci: true` and no checks are
      registered - the help line names that declaration when it applies), but
      the PR is not merged yet. **You are done driving the pipeline.** Do not
      wait for the merge: tell the user the PR is ready and ask them to review

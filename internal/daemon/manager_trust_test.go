@@ -54,8 +54,8 @@ func TestLoadRecoveredConfig_BoundsFetchAndFailsClosed(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected loadRecoveredConfig to abort on trusted-config fetch failure")
 	}
-	if !strings.Contains(err.Error(), "disable_project_settings") {
-		t.Fatalf("abort error should name the boundary, got: %v", err)
+	if !strings.Contains(err.Error(), `failed to fetch trusted config source branch "main"`) {
+		t.Fatalf("abort error should name the unread trusted config source, got: %v", err)
 	}
 	if elapsed := time.Since(started); elapsed > time.Second {
 		t.Fatalf("load recovered config took %s, want under 1s", elapsed)

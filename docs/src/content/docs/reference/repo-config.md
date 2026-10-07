@@ -5,17 +5,18 @@ description: All fields for .no-mistakes.yaml.
 
 Per-repo configuration lives in `.no-mistakes.yaml` at the root of your repository.
 
-:::caution[Security: gate-control fields are read from the default branch]
+:::caution[Security: gate-control fields are read from the trusted config branch]
 `commands.*` and `gates[].command` execute arbitrary shell on the daemon host via `sh -c` / `cmd.exe /c`, and `agent` selects which process launches there (including ordered fallback lists, ACP aliases such as `cursor` and `devin`, and `acp:` targets) with the maintainer's credentials.
-To prevent a supply-chain attack where a contributor lands a hostile value on a gated branch, the daemon always reads **`commands` and `agent` from your default branch** (e.g. `origin/main`), never from the pushed SHA, and reads them at the exact commit a fresh fetch resolved (so a stale `origin/<default>` ref cannot serve a value the live default branch removed).
+To prevent a supply-chain attack where a contributor lands a hostile value on a gated branch, the daemon reads **`commands` and `agent` from your default branch** (e.g. `origin/main`) unless the operator explicitly authorizes another source in machine-local [`repository_overrides.trusted_config_branches`](/no-mistakes/reference/global-config/#repository_overrides) and starts this run with a matching `--base-branch`. It never selects the source from the pushed SHA; it reads the exact commit a fresh fetch resolved (so a stale tracking ref cannot serve a value the live source branch removed).
+This page calls that source the **trusted config branch**: the default branch, unless the run is pinned to an operator-opted-in branch.
 The daemon also reads `document.instructions`, `review.conversation`, `review.path_instructions`, `gates`, `protected_paths`, `disable_project_settings`, `no_ci`, `ci.rerun_transient`, `ci.revalidate_repairs`, `rebase.strategy`, `test.prepare`, `test.base_attribution`, `test.instructions`, `test.allow_approve_over_failure`, `test.evidence.branch`, `pr.template`, `pr.publish_intent`, and `pr.appendix` only from that trusted copy.
-`pr.base_branch` is trusted-default-branch-only as well, but unlike those fields it follows the same `allow_repo_commands: true` opt-in exception as `commands`/`agent` (see [`pr.base_branch`](#prbase_branch) below).
-If the default branch cannot be fetched and resolved to a readable commit, or its present `.no-mistakes.yaml` cannot be read and parsed, the run aborts before launching an agent.
-A readable default-branch tree with no `.no-mistakes.yaml` is valid and uses defaults.
-Commit the gate-control settings you want to your default branch.
+`pr.base_branch` comes from that trusted source as well, but unlike those fields it follows the same `allow_repo_commands: true` opt-in exception as `commands`/`agent` (see [`pr.base_branch`](#prbase_branch) below).
+If the selected source branch cannot be fetched and resolved to a readable commit, or its present `.no-mistakes.yaml` cannot be read and parsed, the run aborts before launching an agent.
+A readable source tree with no `.no-mistakes.yaml` is valid and uses defaults, not another branch's policy.
+Commit the gate-control settings you want to the selected source branch.
 Non-executing fields (`ignore_patterns`, `auto_fix`, `commit`, `intent`, `test`, `pr.title_format`, and `providers`) are still read from the pushed branch, except `test.prepare`, `test.base_attribution`, `test.instructions`, `test.allow_approve_over_failure`, and `test.evidence.branch`.
 
-If you genuinely want per-branch `commands` and `agent` (for example, a single-developer repo where you trust your own feature branches), opt in with [`allow_repo_commands: true`](#allow_repo_commands) in this same file on your default branch. This re-enables the previous behavior with eyes open. The switch is read only from the trusted default-branch copy, so a contributor cannot self-enable it from a pushed branch.
+If you genuinely want per-branch `commands` and `agent` (for example, a single-developer repo where you trust your own feature branches), opt in with [`allow_repo_commands: true`](#allow_repo_commands) in this same file on your trusted source branch. This re-enables the previous behavior with eyes open. The switch is read only from the trusted source copy, so a contributor cannot self-enable it from a pushed branch.
 :::
 
 ```yaml
@@ -34,12 +35,12 @@ ignore_patterns:
   - "*.generated.go"
   - "vendor/**"
 
-# Optional documentation ownership policy, read only from the trusted default branch.
+# Optional documentation ownership policy, read only from the trusted config branch.
 document:
   instructions: |
     docs/ owns detailed product guidance; README.md owns the introduction.
 
-# Optional review settings, read only from the trusted default branch:
+# Optional review settings, read only from the trusted config branch:
 # whether the reviewer may ask you questions while it works (off by default),
 # and extra guidance scoped to the paths a change touches.
 review:
@@ -53,15 +54,15 @@ review:
         Prose changes only. Do not request test coverage.
 
 # For orchestration repos whose project instructions would misidentify gate agents.
-# Read only from the trusted default branch. Defaults to false.
+# Read only from the trusted config branch. Defaults to false.
 disable_project_settings: true
 
 # Positive declaration that this repository intentionally has no CI.
-# Read only from the trusted default branch. Defaults to false (CI expected).
+# Read only from the trusted config branch. Defaults to false (CI expected).
 # no_ci: true
 
 # Optional PR settings.
-# base_branch is read from the trusted default branch.
+# base_branch is read from the trusted config branch.
 # template, publish_intent, and appendix are trusted publication policy.
 # appendix defaults to full. collapsed and minimal shorten the generated tail.
 # title_format is a repository convention and is read from this branch.
@@ -80,14 +81,14 @@ auto_fix:
   lint: 5
   ci: 3
 
-# Read only from the trusted default branch: each rerun is another workflow run,
+# Read only from the trusted config branch: each rerun is another workflow run,
 # and revalidation decides whether a CI repair may ship without review.
 ci:
   rerun_transient: 0
   revalidate_repairs: false
 
 # How a base branch that moved under your branch is integrated.
-# Read only from the trusted default branch.
+# Read only from the trusted config branch.
 rebase:
   strategy: rebase # or: merge
 
@@ -106,7 +107,7 @@ intent:
   disabled_readers: []
 
 test:
-  # Product startup and live-validation runbook, read only from the trusted default branch.
+  # Product startup and live-validation runbook, read only from the trusted config branch.
   instructions: |
     Start the app with `make dev`, then drive the checkout flow in a browser.
   evidence:
@@ -146,18 +147,18 @@ You can also set an ordered fallback list:
 agent: [codex, grok]
 ```
 
-This per-repo `agent` value, including every fallback entry, is still read from the trusted default-branch `.no-mistakes.yaml` unless `allow_repo_commands` is enabled there.
+This per-repo `agent` value, including every fallback entry, is still read from the trusted config branch's `.no-mistakes.yaml` unless `allow_repo_commands` is enabled there.
 
 ### allow_repo_commands
 
-Opt in to honoring the code-executing selection fields (`commands.{prepare,test,lint,format}` and `agent`) from a contributor's pushed branch instead of the trusted default-branch copy.
+Opt in to honoring the code-executing selection fields (`commands.{prepare,test,lint,format}` and `agent`) from a contributor's pushed branch instead of the trusted config branch copy.
 
 | | |
 | --- | --- |
 | Type | `bool` |
 | Default | `false` |
 
-This field is itself read **only from the trusted default-branch copy** of `.no-mistakes.yaml`, never from the pushed SHA, so a contributor cannot self-enable it by setting it on a feature branch. By default the daemon reads `commands` and `agent` from your default branch (e.g. `origin/main`) so a pushed SHA cannot inject shell or pick the launched agent on the daemon host. The PR-target exception is documented under [`pr.base_branch`](#prbase_branch); `pr.template`, `pr.publish_intent`, `pr.appendix`, and the other trusted-only fields listed above do not follow this opt-in. Leave this `false` for any repo that accepts contributions. Set it to `true` only for a single-developer environment where you trust every branch you push (for example, a personal repo gated by your own daemon).
+This field is itself read **only from the trusted config branch copy** of `.no-mistakes.yaml`, never from the pushed SHA, so a contributor cannot self-enable it by setting it on a feature branch. By default the daemon reads `commands` and `agent` from the trusted config branch so a pushed SHA cannot inject shell or pick the launched agent on the daemon host. The PR-target exception is documented under [`pr.base_branch`](#prbase_branch); `pr.template`, `pr.publish_intent`, `pr.appendix`, and the other trusted-only fields listed above do not follow this opt-in. Leave this `false` for any repo that accepts contributions. Set it to `true` only for a single-developer environment where you trust every branch you push (for example, a personal repo gated by your own daemon).
 
 ### disable_project_settings
 
@@ -179,7 +180,7 @@ The gate fails before launching an agent if any resolved agent or fallback lacks
 It also fails if `agent_args_override` defeats suppression, such as a nonzero Codex `project_doc_max_bytes` or Claude setting sources that include `project` or `local`.
 When this option is `false`, missing, or `null`, all agents retain their existing project-setting behavior.
 
-This field is honored **only from the trusted default-branch copy** of `.no-mistakes.yaml`, regardless of `allow_repo_commands`.
+This field is honored **only from the trusted config branch copy** of `.no-mistakes.yaml`, regardless of `allow_repo_commands`.
 A pushed branch cannot enable it or disable a trusted opt-in.
 If the trusted commit or its present config file cannot be read and parsed, the run aborts rather than guessing that the option is disabled.
 
@@ -198,7 +199,7 @@ Absence of this field means CI is expected. A zero-length check result then stay
 
 If checks still appear on a declared no-CI repository, their actual states are processed normally. The declaration never waives a registered pending or failing check.
 
-This field is honored **only from the trusted default-branch copy** of `.no-mistakes.yaml`, regardless of `allow_repo_commands`.
+This field is honored **only from the trusted config branch copy** of `.no-mistakes.yaml`, regardless of `allow_repo_commands`.
 A feature branch cannot self-declare `no_ci: true` to bypass checks, and cannot clear a trusted declaration either.
 
 ### pr.base_branch
@@ -209,7 +210,7 @@ Select the branch that newly created pull requests target.
 | --- | --- |
 | Type | `string` |
 | Default | The repository's forge default branch |
-| Trust | Trusted default branch, unless `allow_repo_commands: true` is explicitly enabled there |
+| Trust | Trusted config branch, unless `allow_repo_commands: true` is explicitly enabled there |
 
 Use this when the repository's integration branch differs from its forge default branch, for example `develop` instead of `main`.
 The configured branch is used for PR creation and pipeline integration and change scoping; the [Pipeline Steps scope rules](/no-mistakes/reference/pipeline-steps/) describe which steps use it and how the recorded per-run override takes precedence.
@@ -220,8 +221,8 @@ A per-run `--base-branch` override is different: if the run's already-open PR ta
 Once a PR exists, its actual forge base branch is authoritative over `pr.base_branch` for the CI step's merge-conflict auto-fix and base-branch tip monitoring, protecting a resumed run from a configuration change made after the PR was created.
 
 Because this setting controls where a PR lands, a pushed branch cannot redirect its own PR target by changing `pr.base_branch`.
-It is read from the trusted default-branch copy regardless of `allow_repo_commands` by default.
-The established explicit `allow_repo_commands: true` opt-in also applies to this setting for repositories that intentionally trust their pushed configuration, including a repository with no trusted default-branch copy of this file at all.
+It is read from the trusted config branch copy regardless of `allow_repo_commands` by default.
+The established explicit `allow_repo_commands: true` opt-in also applies to this setting for repositories that intentionally trust their pushed configuration, including a repository with no trusted config branch copy of this file at all.
 An empty value is valid and means "fall back to the forge default branch"; a non-empty value that Git would reject as a branch name fails config parsing closed, naming `pr.base_branch` in the error.
 
 ### pr.template
@@ -232,7 +233,7 @@ Use a repository Markdown template for the public narrative, followed by no-mist
 | --- | --- |
 | Type | `string` (literal repository-relative path) |
 | Default | Empty (existing generated narrative) |
-| Trust | Path and bytes from the pinned trusted default-branch commit, even under `allow_repo_commands: true`; no global setting |
+| Trust | Path and bytes from the pinned trusted config branch commit, even under `allow_repo_commands: true`; no global setting |
 
 ```yaml
 pr:
@@ -241,7 +242,7 @@ pr:
   appendix: collapsed # Optional; full (the default), collapsed, or minimal.
 ```
 
-For example, commit this template and the configuration to the default branch:
+For example, commit this template and the configuration to the trusted config branch:
 
 ```markdown
 ## Overview
@@ -283,7 +284,7 @@ Control publication of the **generated `Intent` section**, independently of inte
 | --- | --- |
 | Type | `bool` |
 | Default | `true` (missing or `null` also preserves the default) |
-| Trust | Trusted default branch only, regardless of `allow_repo_commands`; the caller-side counterpart is the global [`intent.publish_intent`](/no-mistakes/reference/global-config/#intent) default and the per-run `axi run --no-publish-intent` flag |
+| Trust | Trusted config branch only, regardless of `allow_repo_commands`; the caller-side counterpart is the global [`intent.publish_intent`](/no-mistakes/reference/global-config/#intent) default and the per-run `axi run --no-publish-intent` flag |
 
 `false` suppresses that section in ordinary drafting, fallback output, and template appendices. It works without `pr.template` and does not otherwise enable template mode. It never removes full intent from review or PR-drafting context, changes evidence/attestation policy, or erases author-written sections named `Intent`. Unconfigured defaults remain unchanged.
 
@@ -300,7 +301,7 @@ Choose how much of the generated Risk, Testing, and Pipeline tail is visible aft
 | Type | `string` |
 | Values | `full`, `collapsed`, `minimal` |
 | Default | `full` (missing or empty also preserves the default) |
-| Trust | Trusted default branch only, regardless of `allow_repo_commands` |
+| Trust | Trusted config branch only, regardless of `allow_repo_commands` |
 
 `full` is today's body: `## Risk Assessment`, `## Testing`, and `## Pipeline` follow the narrative, in that order.
 
@@ -358,7 +359,7 @@ A non-zero exit or launch failure fails that step before its command runs.
 
 Use this for deterministic dependency materialization such as `npm ci --prefer-offline`. The run worktree starts with tracked files only, so ignored dependency directories such as `node_modules` are otherwise absent. no-mistakes keeps ignored files produced by preparation, and keeps any submodule it checks out at the commit the superproject records, while removing its tracked, ordinary untracked, and nested-repository mutations before continuing; a submodule commit the command moved to is reset to the recorded commit. Earlier pending tracked and ordinary untracked pipeline changes are restored exactly, so preparation can run before a later configured command without admitting setup artifacts into a fix commit.
 
-Like every `commands.*` value, `commands.prepare` comes from the trusted default-branch configuration unless that trusted copy explicitly enables `allow_repo_commands: true`. no-mistakes never auto-detects an install command from the pushed branch.
+Like every `commands.*` value, `commands.prepare` comes from the trusted config branch configuration unless that trusted copy explicitly enables `allow_repo_commands: true`. no-mistakes never auto-detects an install command from the pushed branch.
 
 ### commands.test
 
@@ -415,7 +416,7 @@ The document step always applies a built-in placement policy: every fact has exa
 `document.instructions` states this repository's ownership map or extra placement rules (for example, which file owns which class of facts).
 It augments or clarifies the built-in policy; it cannot disable documentation integrity, and it cannot turn the memory files into an automated documentation surface - instructions that encourage additions to `AGENTS.md` or `CLAUDE.md` do not take effect over the built-in correction-only rule.
 
-Like `commands.*` and `agent`, this field steers gate behavior, so it is honored **only from the trusted default-branch copy** of `.no-mistakes.yaml`: a contributor's pushed branch cannot weaken the documentation rules that gate its own review.
+Like `commands.*` and `agent`, this field steers gate behavior, so it is honored **only from the trusted config branch copy** of `.no-mistakes.yaml`: a contributor's pushed branch cannot weaken the documentation rules that gate its own review.
 
 An operator can add their own policy for this repository through a machine-local [`repository_overrides`](/no-mistakes/reference/global-config/#machine-local-review-and-documentation-guidance) entry; it is rendered as a separate, labeled section and never replaces this field.
 
@@ -427,14 +428,14 @@ Whether the reviewer may ask you questions while it reviews, instead of turning 
 |---|---|
 | Type | `boolean` |
 | Default | `false` |
-| Trust | Read only from the trusted default branch |
+| Trust | Read only from the trusted config branch |
 
 ```yaml
 review:
   conversation: true
 ```
 
-**Opting in.** Commit that block to your **default branch** (the same copy the daemon reads `commands` and `agent` from). It takes effect on the next run of every branch in the repository; a branch cannot opt itself in or out, in either direction. A contributor must not be able to make their own review park for a human answer, and once you have asked for the conversation a pushed branch must not be able to decline it.
+**Opting in.** Commit that block to your **trusted config branch** (the same copy the daemon reads `commands` and `agent` from). It takes effect on the next run of every branch in the repository; a branch cannot opt itself in or out, in either direction. A contributor must not be able to make their own review park for a human answer, and once you have asked for the conversation a pushed branch must not be able to decline it.
 
 **On**, the review step gains a question channel. The reviewer emits each larger question the moment it has one, keeps reviewing while it is open, and re-reads answers at its own checkpoints. A pass that ends with an unanswered question parks with one `ask-user` warning per question; you answer each with [`no-mistakes axi answer`](/no-mistakes/reference/cli/#no-mistakes-axi-answer), and once none are open the reviewer finishes its pass with your answers - resuming that same session when [`session_reuse`](/no-mistakes/reference/global-config/#session_reuse) is on, cold otherwise. Answers are recorded per branch, reach every later cold reviewer as settled, and are published in the PR body.
 
@@ -497,7 +498,7 @@ These checks run on whichever copy of the file is parsed, including the pushed b
 
 #### Trust
 
-Like `document.instructions`, this field steers gate behavior, so it is honored **only from the trusted default-branch copy** of `.no-mistakes.yaml`, regardless of [`allow_repo_commands`](#allow_repo_commands): a value present only on a pushed branch is ignored, so a contributor cannot inject instructions into the review that gates them.
+Like `document.instructions`, this field steers gate behavior, so it is honored **only from the trusted config branch copy** of `.no-mistakes.yaml`, regardless of [`allow_repo_commands`](#allow_repo_commands): a value present only on a pushed branch is ignored, so a contributor cannot inject instructions into the review that gates them.
 
 #### Machine-local rules
 
@@ -532,7 +533,7 @@ The delivery tail (`push`, `pr`, `ci`) cannot be anchored: a gate that ran after
 
 Gates are inserted into the run's step sequence and never replace, reorder, or remove a core step. Two gates sharing an anchor run in the order they appear in the file. A gate shares its anchor's step order, so a restart that resets from the anchor resets the gate with it.
 
-A run resolves this list once when it starts. Adding or removing a gate on the default branch therefore applies to later runs and never retargets a run already in flight. [Daemon crash recovery](/no-mistakes/concepts/daemon/#crash-recovery) owns how the recorded list is restored after a restart.
+A run resolves this list once when it starts. Adding or removing a gate on the trusted config branch therefore applies to later runs and never retargets a run already in flight. [Daemon crash recovery](/no-mistakes/concepts/daemon/#crash-recovery) owns how the recorded list is restored after a restart.
 
 #### Failure
 
@@ -556,7 +557,7 @@ A malformed entry fails when the config is parsed, so the run aborts before any 
 
 #### Trust
 
-A gate executes shell on the daemon host, so it is honored **only from the trusted default-branch copy** of `.no-mistakes.yaml`, regardless of [`allow_repo_commands`](#allow_repo_commands).
+A gate executes shell on the daemon host, so it is honored **only from the trusted config branch copy** of `.no-mistakes.yaml`, regardless of [`allow_repo_commands`](#allow_repo_commands).
 
 That opt-in deliberately does not extend here. It covers a pushed branch re-running its own suite through `commands.*`; a gate instead defines what validating the branch *means*, so a contributor must not be able to declare, retarget, or delete the check that clears them.
 
@@ -597,7 +598,7 @@ Opt-in paths that automatic commits must leave for an operator to resolve.
 | --- | --- |
 | Type | `string[]` |
 | Default | Empty (no protected paths) |
-| Trust | Trusted default branch only, regardless of `allow_repo_commands` |
+| Trust | Trusted config branch only, regardless of `allow_repo_commands` |
 
 ```yaml
 protected_paths:
@@ -606,7 +607,7 @@ protected_paths:
   - ".github/**"
 ```
 
-Patterns use the same syntax as [`ignore_patterns`](#ignore_patterns). Empty or malformed rules fail config loading. Commit this setting to the default branch to enable it; a pushed branch cannot add, remove, or replace the trusted policy for its own run.
+Patterns use the same syntax as [`ignore_patterns`](#ignore_patterns). Empty or malformed rules fail config loading. Commit this setting to the trusted config branch to enable it; a pushed branch cannot add, remove, or replace the trusted policy for its own run.
 
 Before staging an automatic Review, Test, Document, Lint, or CI repair, an operator-authorized repository gate repair, or a Push leftover commit, the pipeline checks the index and worktree for dirty protected paths. This includes staged and unstaged modifications, deletions, both ends of renames, and individual untracked files inside new directories. A match refuses the entire commit and parks the step at an operator approval gate naming the path and rule. The index and all working files stay as they were; nothing is restored, unstaged, discarded, or partially committed. The Push check also covers formatter changes and residue from earlier steps. [Daemon & Worktrees](/no-mistakes/concepts/daemon/#what-it-does) owns retention across terminal cleanup and crash recovery.
 
@@ -652,9 +653,9 @@ This covers cancellations on supported providers and, when the value is positive
 | Type | `int` |
 | Default | `0` |
 | Range | `0` to `5`; values outside it are clamped |
-| Trust | Read only from the trusted default branch |
+| Trust | Read only from the trusted config branch |
 
-Every rerun this budget authorizes is another provider-side workflow run billed to the repository, so the value is read only from the trusted default-branch copy of this file, exactly like `document.instructions` and `disable_project_settings`.
+Every rerun this budget authorizes is another provider-side workflow run billed to the repository, so the value is read only from the trusted config branch copy of this file, exactly like `document.instructions` and `disable_project_settings`.
 A pushed branch cannot raise its own rerun budget.
 The default is `0` because a cancelled conclusion does not identify its cause: the same value covers the provider aborting its own infrastructure, a maintainer stopping a runaway or unsafe job, and repository concurrency with `cancel-in-progress`.
 Rerunning on that ambiguity can restart work someone deliberately stopped, so raise this only for a repository whose cancellations are known to be provider-side.
@@ -709,7 +710,7 @@ Whether every CI repair must re-pass the pipeline before it is published, or onl
 |---|---|
 | Type | `bool` |
 | Default | `false` |
-| Trust | Read only from the trusted default branch |
+| Trust | Read only from the trusted config branch |
 
 ```yaml
 ci:
@@ -748,7 +749,7 @@ Registered review-bot checks now park as `ask-user` findings instead of entering
 Before review-bot checks were classified structurally, [firstmate#3250](https://github.com/kunchenguid/firstmate/pull/3250) demonstrated the risk: a CI repair responding to bot feedback made a `--changed` test run serial by default, contradicting the change's stated intent; the restarted Review caught it and reversed it. Without revalidation that repair would have shipped.
 That is the safety this option buys, and the reason it is offered rather than removed.
 
-This value is read only from the trusted default-branch copy of this file, like `ci.rerun_transient` and `disable_project_settings`.
+This value is read only from the trusted config branch copy of this file, like `ci.rerun_transient` and `disable_project_settings`.
 A pushed branch cannot turn a maintainer's revalidation requirement off for its own repairs, and cannot turn it on either.
 
 A value set here always wins over the operator's own [`ci.revalidate_repairs`](/no-mistakes/reference/global-config/#cirevalidate_repairs), in both directions: `true` here enables revalidation even when the global value is `false`, and an explicit `false` here opts out even when the global value is `true`.
@@ -762,14 +763,14 @@ How the [Rebase step](/no-mistakes/reference/pipeline-steps/#rebase) integrates 
 |---|---|
 | Type | `string` (`rebase` or `merge`) |
 | Default | `rebase` |
-| Trust | Read only from the trusted default branch |
+| Trust | Read only from the trusted config branch |
 
 ```yaml
 rebase:
   strategy: merge
 ```
 
-**Opting in.** Commit that block to your **default branch** (the same copy the daemon reads `commands` and `agent` from). It takes effect on the next run of every branch in the repository; a branch cannot opt itself in or out. The default stays `rebase` for every repository that does not ask, so upgrading no-mistakes never changes the shape of history under you.
+**Opting in.** Commit that block to your **trusted config branch** (the same copy the daemon reads `commands` and `agent` from). It takes effect on the next run of every branch in the repository; a branch cannot opt itself in or out. The default stays `rebase` for every repository that does not ask, so upgrading no-mistakes never changes the shape of history under you.
 
 - **`rebase` (default)** replays the branch's commits on top of the new base. This is the historical behavior and is unchanged.
 - **`merge`** integrates the base with a `git merge --no-ff` commit whose **first parent** is the head the pipeline reviewed.
@@ -793,7 +794,7 @@ Integration publishes as a fast-forward under `merge`. A CI merge-conflict repai
 
 **The cost is a merge commit per integration.** On a squash-merged default branch (one commit per PR) those commits collapse at landing and never reach it. On a merge-committed one they do, so the history is a graph rather than a line.
 
-This value is read only from the trusted default-branch copy of this file, regardless of [`allow_repo_commands`](#allow_repo_commands). It decides whether integrating a moved base leaves auditable evidence behind, so a pushed branch must not be able to change it in either direction. A value set here wins over the operator's own [`rebase.strategy`](/no-mistakes/reference/global-config/#rebasestrategy).
+This value is read only from the trusted config branch copy of this file, regardless of [`allow_repo_commands`](#allow_repo_commands). It decides whether integrating a moved base leaves auditable evidence behind, so a pushed branch must not be able to change it in either direction. A value set here wins over the operator's own [`rebase.strategy`](/no-mistakes/reference/global-config/#rebasestrategy).
 
 ### commit.fix_message
 
@@ -857,7 +858,7 @@ Valid `disabled_readers` values are `claude`, `codex`, `opencode`, `rovodev`, `p
 
 ### test.prepare
 
-**Type:** boolean. **Default:** `false`. Repository-only, trusted-default-branch-only, even with `allow_repo_commands: true`.
+**Type:** boolean. **Default:** `false`. Repository-only, trusted-config-branch-only, even with `allow_repo_commands: true`.
 
 ```yaml
 commands:
@@ -871,11 +872,11 @@ Opts agent-only Test into running `commands.prepare` before its first agent turn
 
 This is **eager**, not on-demand: opted-in repositories pay setup cost even when the evidence agent subsequently reports `no-surface`. Leave it off to retain lazy command-only preparation. Preparation does not replace fresh Test evidence or change verdict/approval policy. Failures stop Test before the agent launches and never record successful preparation.
 
-The trigger always comes from the trusted default branch; pushed-branch text cannot enable it. The executable `commands.prepare` value separately follows the existing `allow_repo_commands` policy.
+The trigger always comes from the trusted config branch; pushed-branch text cannot enable it. The executable `commands.prepare` value separately follows the existing `allow_repo_commands` policy.
 
 ### test.base_attribution
 
-**Type:** boolean. **Default:** `false`. Repository-only, trusted-default-branch-only, even with `allow_repo_commands: true`.
+**Type:** boolean. **Default:** `false`. Repository-only, trusted-config-branch-only, even with `allow_repo_commands: true`.
 
 ```yaml
 commands:
@@ -904,7 +905,7 @@ Repository-specific runbook for standing the product up during live validation.
 | Default | Empty |
 
 The Test step injects these instructions into its evidence prompt so the agent can start and drive the real product the way an end user would.
-Like `document.instructions`, this field steers its own gate, so it is honored **only from the trusted default-branch copy** of `.no-mistakes.yaml`, regardless of `allow_repo_commands`. A contributor's pushed branch cannot rewrite the runbook that validates that branch.
+Like `document.instructions`, this field steers its own gate, so it is honored **only from the trusted config branch copy** of `.no-mistakes.yaml`, regardless of `allow_repo_commands`. A contributor's pushed branch cannot rewrite the runbook that validates that branch.
 
 ### test.allow_approve_over_failure
 
@@ -917,7 +918,7 @@ Recorded reason that opts this repository into letting the `PR must be raised vi
 
 Off by default. When a Test step is approved while `commands.test` exited non-zero, no-mistakes records that as an override on the step and copies it onto the PR attestation as `steps[].override_reason`. The required check then refuses that attestation unless this field is a non-empty reason, which is copied into the attestation as `allow_test_command_override`.
 
-Like `no_ci`, this field weakens a merge gate, so it is honored **only from the trusted default-branch copy** of `.no-mistakes.yaml`, regardless of `allow_repo_commands`. A contributor's pushed branch cannot waive the configured-test check that certifies it. The string is the recorded reason; whitespace-only is treated as unset.
+Like `no_ci`, this field weakens a merge gate, so it is honored **only from the trusted config branch copy** of `.no-mistakes.yaml`, regardless of `allow_repo_commands`. A contributor's pushed branch cannot waive the configured-test check that certifies it. The string is the recorded reason; whitespace-only is treated as unset.
 
 ### test.evidence
 
@@ -934,7 +935,7 @@ Fields not set here inherit from global config and then the built-in defaults.
 By default, test evidence is written to `<NM_HOME>/evidence/<run-id>`. Where it is stored locally and how long it is kept are global-only settings; see [`test.evidence`](/no-mistakes/reference/global-config/#testevidence).
 On GitHub.com/GHEC, supported image and video artifacts are uploaded to GitHub user-attachments when the PR is rendered unless `attach_media` is false and `store_in_repo` is also false.
 For GitHub repositories, set `store_in_repo: true` to also publish it to an orphan evidence branch in the code branch's push-target repository and link the artifacts from the PR body; evidence is never committed to the pushed branch, so it never reaches the default branch.
-`test.evidence.branch` is read ONLY from the trusted default-branch copy of this file, because it names a git ref the daemon pushes to; a pushed branch cannot redirect evidence commits.
+`test.evidence.branch` is read ONLY from the trusted config branch copy of this file, because it names a git ref the daemon pushes to; a pushed branch cannot redirect evidence commits.
 See [global config](/no-mistakes/reference/global-config/#testevidence) for provider support, limits, validation, and fail-closed behavior.
 
 ### providers.github.draft_pull_requests

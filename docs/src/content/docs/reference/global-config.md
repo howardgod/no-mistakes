@@ -314,7 +314,9 @@ responsibility; no-mistakes does not inspect subscriptions or query quotas.
 A pin applies to **every pipeline duty**, including reviewer and fixer roles.
 The effective trusted agent selection must be Pi-only (no `auto`, non-Pi
 fallbacks, or non-Pi `review_agents`), including `agent` / fallbacks from the
-trusted default-branch `.no-mistakes.yaml`. That check runs before any active
+trusted config branch's `.no-mistakes.yaml` (the default branch, unless the run
+is pinned to an operator-opted-in branch; see the
+[repo config security note](/no-mistakes/reference/repo-config/)). That check runs before any active
 validation is cancelled. Pi role-specific model/effort values are
 superseded by the run pin. Native `--model`, `--provider`, `--models`,
 `--thinking` (including `--flag=value`), or `--` in
@@ -894,7 +896,7 @@ ci:
 ```
 
 Each rerun is another provider-side workflow run billed to the repository being contributed to.
-Set `0` here to never spend someone else's CI minutes; this is the only place to make that choice for a repository whose default branch you do not control.
+Set `0` here to never spend someone else's CI minutes; this is the only place to make that choice for a repository whose trusted config branch you do not control.
 
 The per-repo [`ci.rerun_transient`](/no-mistakes/reference/repo-config/#cirerun_transient) overrides this value and owns the classification, the trust boundary, and every case that skips the rerun.
 
@@ -1122,7 +1124,7 @@ Eval replay cases store no remote URL, so a replay does not apply a matching ent
 #### Machine-local commands
 
 A matching `commands` block supplements the repository's trusted commands; it never changes their strings or removes them.
-Repository command selection still comes from the trusted default branch, or the pushed branch only with trusted `allow_repo_commands: true`.
+Repository command selection still comes from the trusted config source (the default branch, or a branch listed under [`trusted_config_branches`](#trusted-config-source-branches) for an explicit `--base-branch` run), or the pushed branch only with trusted `allow_repo_commands: true`.
 Only the operator's global config can supply these local settings, never a repository's `.no-mistakes.yaml`.
 With no matching command override, execution remains unchanged.
 
@@ -1170,6 +1172,26 @@ This record is independent of optional eval capture.
 Recovery appends a new snapshot of the configuration it resolves, including removal of a previously active local override.
 A snapshot write failure stops execution before checks run.
 The file is private local evidence, restricted to owner-only permissions on POSIX on every write (including a file left from an earlier snapshot) and excluded from PR and test-evidence publication.
+
+#### Trusted config source branches
+
+```yaml
+repository_overrides:
+  git@github.com:syna-isd/SynArp.git:
+    trusted_config_branches: [verify]
+```
+
+`trusted_config_branches` has no repository-config equivalent: it is an operator-only list of exact branch names, for this exact upstream remote, that may replace the default branch as a run's trusted config source (the copy of `.no-mistakes.yaml` that supplies `gates`, `commands`, `agent`, `review.path_instructions`, `pr.template` and every other [trusted-only field](/no-mistakes/reference/repo-config/)).
+A run uses a listed branch only when it was started with an explicit matching `axi run --base-branch <branch>`; a run without that flag, or naming an unlisted branch, keeps the registered default branch as its source, exactly as without this setting.
+A pushed or trusted `.no-mistakes.yaml`, its `pr.base_branch`, and a live PR base can never grant this authority.
+The run pins the selected branch in its own record, separate from its PR target, and reads both the config and the `pr.template` file at the one commit a fresh fetch of that branch resolved.
+If that branch cannot be fetched, has disappeared, or carries a present `.no-mistakes.yaml` that cannot be read or parsed, the run stops before any agent starts; it never falls back to the default branch or the pushed branch.
+A readable source tree with no `.no-mistakes.yaml` is valid and uses defaults: it does **not** mean checks are configured, and it does not borrow the default branch's policy.
+Daemon recovery of a parked run re-fetches the same pinned branch (its gate list stays the one pinned at start) and refuses to resume if the branch is no longer listed here or cannot be read; such a run fails with the generic recovery error, and the daemon log names the reason.
+The CI step stops a pinned run whose PR is retargeted away from that branch.
+Runs created before this setting existed, or without a pin, keep default-branch semantics.
+
+**Trust warning:** everyone who can update an opted-in branch on the registered upstream controls the same things as someone who can update the default branch: repository gates and shell commands run on the daemon host, agent selection, review and test rules, and pass and override policy, including whether that branch's `allow_repo_commands: true` lets pushed branches supply `commands` and `agent`. Check that branch's write permissions and protection before listing it. The source is always the registered upstream, never a contributor fork with the same branch name.
 
 ### intent
 
@@ -1247,7 +1269,7 @@ Reaping runs after each finished run and again at daemon startup. An upgraded da
 
 `local_root` must be an absolute path outside `<NM_HOME>/worktrees`; a relative or managed-worktree path fails daemon startup and prevents new or recovered runs from starting. Because `retention` bounds how long a PR body's local artifact links keep resolving, raise it rather than lowering it if your reviews run long.
 
-The publication fields are global defaults. Repo config can override `store_in_repo`, `attach_media`, and `dir`; it can override `branch` only through the trusted default-branch copy. `local_root`, `retention`, and `max_runs` are global-only: a repository does not get to name a filesystem path this machine's daemon writes to, or set the retention budget for a directory every repository on the machine shares.
+The publication fields are global defaults. Repo config can override `store_in_repo`, `attach_media`, and `dir`; it can override `branch` only through the trusted config branch copy. `local_root`, `retention`, and `max_runs` are global-only: a repository does not get to name a filesystem path this machine's daemon writes to, or set the retention budget for a directory every repository on the machine shares.
 
 `test.evidence.retention` and `test.evidence.max_runs` also bound `<NM_HOME>/logs/<run-id>` (per-run step logs), reaped on the same cadence rather than through a second config surface for the same kind of per-run diagnostic artifact.
 
