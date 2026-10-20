@@ -674,7 +674,7 @@ Override auto-fix attempt limits for specific steps. Core-step fields not set he
 | `auto_fix.document` | `int` | Inherits from global (default `3`) |
 | `auto_fix.lint` | `int` | Inherits from global (default `3`) |
 | `auto_fix.ci` | `int` | Inherits from global (default `3`) |
-| `auto_fix.gates.<name>` | Non-negative `int` | `0`, trusted default branch only |
+| `auto_fix.gates.<name>` | Non-negative `int` | `0`, trusted config branch only |
 
 Set to `0` to disable the follow-up auto-fix loop for a step (findings require manual approval).
 The document step attempts documentation fixes during its initial pass, so unresolved documentation findings pause for approval instead of using an automatic follow-up loop.
@@ -691,7 +691,7 @@ auto_fix:
     mutation-budget: 2
 ```
 
-This budget is honored only from the trusted default-branch config, even with `allow_repo_commands: true`. Global `auto_fix.gates` entries are rejected, including empty maps. Unknown gate names, negative budgets, and non-integer values are rejected.
+This budget is honored only from the trusted config branch copy, even with `allow_repo_commands: true`. Global `auto_fix.gates` entries are rejected, including empty maps. Unknown gate names, negative budgets, and non-integer values are rejected.
 
 With a positive budget, a gate with at least one `auto-fix` finding and no `ask-user` findings uses the shared fix loop. The fixer receives the findings and decision history, commits repairs like Test, and re-runs the gate. It parks when the budget is exhausted or a repair returns as many or more findings than the round it answered. Changing finding IDs without reducing the count is not progress. Manual fix, approve, and skip responses remain unchanged. This budget does not require non-waivable command success under unattended AXI.
 
@@ -817,7 +817,7 @@ When the CI step reads a supported review bot's (currently Greptile's) unresolve
 |---|---|
 | Type | `string` (`on_failure` or `always`) |
 | Default | `on_failure` |
-| Trust | Read only from the trusted default branch |
+| Trust | Read only from the trusted config branch |
 
 ```yaml
 ci:
@@ -841,7 +841,7 @@ Under `always`:
 
 Forges that cannot supply review comments are unaffected by either value. Because only GitHub can attribute a *check* to a review bot, `on_failure` reads nothing on GitLab: a GitLab run needs `always` for the bot's unresolved discussions to become findings.
 
-This value is read only from the trusted default-branch copy of this file, like the rest of the `ci` block: a pushed branch cannot silence a green bot's comments on itself, and cannot opt itself in either.
+This value is read only from the trusted config branch copy of this file, like the rest of the `ci` block: a pushed branch cannot silence a green bot's comments on itself, and cannot opt itself in either.
 A value set here wins over the operator's own [`ci.review_bot_comments`](/no-mistakes/reference/global-config/#cireview_bot_comments).
 
 ### ci.rebase_behind
@@ -852,7 +852,7 @@ Whether the CI monitor rebases a green GitHub PR that GitHub reports `mergeState
 |---|---|
 | Type | `bool` |
 | Default | `false` |
-| Trust | Read only from the trusted default branch |
+| Trust | Read only from the trusted config branch |
 
 ```yaml
 ci:
@@ -869,7 +869,7 @@ Off by default because every rebase rewrites the head, so it always revalidates 
 Each one also spends an [`auto_fix.ci`](#auto_fix) attempt.
 Other providers never report `BEHIND`, so the key only has an effect on GitHub.
 
-This value is read only from the trusted default-branch copy of this file, like the rest of the `ci` block: a pushed branch cannot opt itself into the extra passes, or out of them.
+This value is read only from the trusted config branch copy of this file, like the rest of the `ci` block: a pushed branch cannot opt itself into the extra passes, or out of them.
 A value set here wins over the operator's own [`ci.rebase_behind`](/no-mistakes/reference/global-config/#cirebase_behind) in both directions.
 
 ### ci.carry_review_on_replay
@@ -880,7 +880,7 @@ Whether a CI rebase repair that only replayed the reviewed commits keeps the run
 |---|---|
 | Type | `bool` |
 | Default | `false` |
-| Trust | Read only from the trusted default branch |
+| Trust | Read only from the trusted config branch |
 
 ```yaml
 ci:
@@ -912,7 +912,7 @@ The approval is moved only from the approval the check was made against: an appr
 
 The restart at Test is recorded with the carried approval, in the same write, and stays pending until the Push step publishes after Test onward has run. So it survives the CI step parking on findings that need your decision: approving them, even after a daemon restart, restarts at Test; a fix round that changes nothing or fails restarts at Test too; and a fix round that commits on top of the carried head revalidates from Review, even when its fixer then fails. None of these publishes the carried head directly.
 
-This value is read only from the trusted default-branch copy of this file, like the rest of the `ci` block: a pushed branch cannot let its own rebases skip Review.
+This value is read only from the trusted config branch copy of this file, like the rest of the `ci` block: a pushed branch cannot let its own rebases skip Review.
 A value set here wins over the operator's own [`ci.carry_review_on_replay`](/no-mistakes/reference/global-config/#cicarry_review_on_replay) in both directions.
 
 ### ci.release_after_checks_pass
@@ -923,7 +923,7 @@ Whether the CI step finishes the run at its checks verdict instead of monitoring
 |---|---|
 | Type | `bool` |
 | Default | `false` |
-| Trust | Read only from the trusted default branch |
+| Trust | Read only from the trusted config branch |
 
 ```yaml
 ci:
@@ -933,7 +933,7 @@ ci:
 - **`false` (default)** is what the step has always done: once every check is green the run records readiness and keeps watching the PR until it is merged, closed, or declined, and a later base-branch advance or conflict is still repaired on its own.
 - **`true`** finishes the step at that point. The run completes with the `checks_passed` status, releases its worktree, and reports `outcome: checks-passed`; whether and when the PR is merged is then the user's decision, and nothing observes the merge afterwards, so the recorded CI duration stops at the checks verdict instead of including the wait for a merge.
 
-This value is read only from the trusted default-branch copy of this file, like the rest of the `ci` block: a pushed branch cannot opt itself into the shorter run, or out of it.
+This value is read only from the trusted config branch copy of this file, like the rest of the `ci` block: a pushed branch cannot opt itself into the shorter run, or out of it.
 A value set here wins over the operator's own [`ci.release_after_checks_pass`](/no-mistakes/reference/global-config/#cirelease_after_checks_pass) in both directions.
 
 ### rebase.strategy

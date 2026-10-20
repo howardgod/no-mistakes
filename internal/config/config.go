@@ -1703,15 +1703,16 @@ ci:
   # on the current head, or has not registered on it yet once every other check
   # is green, so an unresolved bot comment parks the step for a decision
   # instead of reporting checks-passed. A repository that sets
-  # ci.review_bot_comments on its own default branch overrides this value.
+  # ci.review_bot_comments on its own trusted config branch overrides this
+  # value.
   review_bot_comments: on_failure
   # Whether the CI monitor rebases a green GitHub PR that GitHub reports BEHIND
   # because its base requires branches to be up to date. Defaults to false: the
   # PR reports checks-passed and waits for a human to bring it up to date. Set
   # true to have the monitor rebase it once the base holds still for one poll;
   # each such rebase revalidates from Review, so it costs another full pipeline
-  # pass. A repository that sets ci.rebase_behind on its own default branch
-  # overrides this value.
+  # pass. A repository that sets ci.rebase_behind on its own trusted config
+  # branch overrides this value.
   rebase_behind: false
   # Whether a CI rebase repair that only replayed the reviewed commits keeps
   # its review approval. Defaults to false: every rebase repair revalidates
@@ -1719,8 +1720,8 @@ ci:
   # provable pure replay - every reviewed commit replayed without a conflict
   # and patch-identical to the one it replaced. Anything else still
   # revalidates from Review. No effect when revalidate_repairs is true. A
-  # repository that sets ci.carry_review_on_replay on its own default branch
-  # overrides this value.
+  # repository that sets ci.carry_review_on_replay on its own trusted config
+  # branch overrides this value.
   carry_review_on_replay: false
 
   # Whether the CI step finishes the run as soon as every check is green
@@ -1732,7 +1733,7 @@ ci:
   # run's worktree and lane are not held for a human merge decision - the
   # recorded CI duration then measures CI only. CI readiness is still recorded
   # either way; a repository that sets ci.release_after_checks_pass on its own
-  # default branch overrides this value.
+  # trusted config branch overrides this value.
   release_after_checks_pass: false
 
 # Auto-fix commit subject template. Available variables: {{.Step}}, {{.Summary}}, and {{.Branch}}.
@@ -2675,7 +2676,7 @@ func LoadGlobalFromBytes(data []byte) (*GlobalConfig, error) {
 		return nil, fmt.Errorf("parse global config: %w", err)
 	}
 	if !repoOnly.AutoFix.Gates.IsZero() {
-		return nil, fmt.Errorf("auto_fix.gates is repository-only; configure it on the trusted default branch")
+		return nil, fmt.Errorf("auto_fix.gates is repository-only; configure it on the trusted config branch")
 	}
 	if err := validateGlobalCommitRaw(raw.Commit); err != nil {
 		return nil, fmt.Errorf("parse global config: %w", err)
