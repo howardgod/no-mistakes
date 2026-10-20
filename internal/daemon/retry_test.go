@@ -211,6 +211,9 @@ type retryFixtureOptions struct {
 	invocation db.AgentInvocation
 	// findings is the findings JSON the carried review round recorded.
 	findings *string
+	// trustedConfigBranch pins the failed run to an operator-listed trusted
+	// config branch (and the matching explicit --base-branch).
+	trustedConfigBranch string
 }
 
 func newRetryFixture(t *testing.T, opts retryFixtureOptions) *retryFixture {
@@ -229,7 +232,8 @@ func newRetryFixture(t *testing.T, opts retryFixtureOptions) *retryFixture {
 	if opts.profile != nil {
 		profiles = append(profiles, opts.profile)
 	}
-	source, err := d.InsertRunWithIntentAndLaunchNonce(repo.ID, "main", submitted, submitted, &db.RunIntent{Summary: "keep it", Source: db.RunIntentSourceAgent, Score: 1}, "", "", "", "", false, opts.plan, profiles...)
+	pin := opts.trustedConfigBranch
+	source, err := d.InsertRunWithTrustedConfigBranch(repo.ID, "main", submitted, submitted, &db.RunIntent{Summary: "keep it", Source: db.RunIntentSourceAgent, Score: 1}, "", "", "", pin, pin, false, opts.plan, profiles...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -476,6 +480,8 @@ func TestRetryRefusesUnlessEveryProofHolds(t *testing.T) {
 			gitCmd(t, f.repo.WorkingPath, "reset", "--hard", f.submitted)
 			return f.source.ID
 		}},
+		{name: "a revoked trusted config branch", proof: "compatible configuration", reason: "no longer authorized",
+			opts: retryFixtureOptions{trustedConfigBranch: "verify"}},
 		{name: "a verification plan", proof: "compatible configuration",
 			opts: retryFixtureOptions{plan: &verificationplan.Snapshot{ID: "plan-bound-run", Path: "plan.md", SourcePath: "plan.md", SHA256: "abc", CapturedAt: 1}}},
 		{name: "a model profile that no longer resolves", proof: "compatible configuration",
