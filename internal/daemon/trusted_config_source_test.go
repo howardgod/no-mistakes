@@ -57,7 +57,7 @@ func trustedSourceGate(t *testing.T, verifyConfig string) (bare, wt string) {
 func TestResolveTrustedSource_ReadsOnlyTheSelectedBranchAtItsFetchedSHA(t *testing.T) {
 	ctx := context.Background()
 	bare, wt := trustedSourceGate(t, "commands:\n  lint: \"echo verify-lint\"\n")
-	sha, cfg, err := resolveTrustedSource(ctx, wt, &db.Repo{DefaultBranch: "main"}, "verify", "run", fetchForStart)
+	sha, cfg, err := resolveTrustedSource(ctx, wt, &db.Repo{DefaultBranch: "main"}, "verify", "run", fetchForStart, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,13 +73,13 @@ func TestResolveTrustedSource_MissingBranchNeverReadsItsStaleTrackingRef(t *test
 	ctx := context.Background()
 	bare, wt := trustedSourceGate(t, "commands:\n  lint: \"echo verify-lint\"\n")
 	repo := &db.Repo{DefaultBranch: "main"}
-	for _, mode := range []trustedFetch{fetchForStart, fetchForRecovery, fetchForPiPreflight} {
+	for _, mode := range []trustedFetch{fetchForStart, fetchForRecovery, fetchForPreflight} {
 		// A previous run left origin/verify behind; then verify was deleted.
 		if err := git.FetchRemoteBranch(ctx, wt, "origin", "verify"); err != nil {
 			t.Fatal(err)
 		}
 		gitCmd(t, bare, "update-ref", "-d", "refs/heads/verify")
-		sha, cfg, err := resolveTrustedSource(ctx, wt, repo, "verify", "run", mode)
+		sha, cfg, err := resolveTrustedSource(ctx, wt, repo, "verify", "run", mode, "test")
 		if err == nil || sha != "" || cfg != nil {
 			t.Fatalf("mode %d: sha=%q cfg=%+v err=%v; want a refusal, not the stale tracking ref or main", mode, sha, cfg, err)
 		}
@@ -92,7 +92,7 @@ func TestResolveTrustedSource_MissingBranchNeverReadsItsStaleTrackingRef(t *test
 
 func TestResolveTrustedSource_UnparseableSourceConfigAborts(t *testing.T) {
 	_, wt := trustedSourceGate(t, "gates: [unterminated\n")
-	_, _, err := resolveTrustedSource(context.Background(), wt, &db.Repo{DefaultBranch: "main"}, "verify", "run", fetchForStart)
+	_, _, err := resolveTrustedSource(context.Background(), wt, &db.Repo{DefaultBranch: "main"}, "verify", "run", fetchForStart, "test")
 	if err == nil || !strings.Contains(err.Error(), `trusted source branch "verify"`) || !strings.Contains(err.Error(), "unparseable") {
 		t.Fatalf("err = %v, want an abort naming verify's unparseable config", err)
 	}

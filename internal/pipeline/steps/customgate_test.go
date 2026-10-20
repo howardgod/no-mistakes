@@ -29,6 +29,7 @@ func stepNames(steps []pipeline.Step) []string {
 // The core sequence must survive gate insertion intact: same members, same
 // relative order. A gate can lengthen a run, never reshape it.
 func TestWithCustomGates_InsertsAfterAnchorAndPreservesCore(t *testing.T) {
+	t.Parallel()
 	got := stepNames(WithCustomGates(AllSteps(), []config.Gate{
 		{Name: "mutation-budget", After: types.StepTest, Command: "make mutation"},
 		{Name: "arch-fitness", After: types.StepReview, Command: "make arch-fitness"},
@@ -43,6 +44,7 @@ func TestWithCustomGates_InsertsAfterAnchorAndPreservesCore(t *testing.T) {
 }
 
 func TestWithCustomGates_KeepsDeclarationOrderOnSharedAnchor(t *testing.T) {
+	t.Parallel()
 	got := stepNames(WithCustomGates(AllSteps(), []config.Gate{
 		{Name: "first", After: types.StepLint, Command: "a"},
 		{Name: "second", After: types.StepLint, Command: "b"},
@@ -54,12 +56,14 @@ func TestWithCustomGates_KeepsDeclarationOrderOnSharedAnchor(t *testing.T) {
 }
 
 func TestWithCustomGates_NoGatesReturnsCore(t *testing.T) {
+	t.Parallel()
 	if got, want := len(WithCustomGates(AllSteps(), nil)), len(AllSteps()); got != want {
 		t.Fatalf("step count = %d, want the core %d", got, want)
 	}
 }
 
 func TestCustomGateStep_CommandPassRunsClean(t *testing.T) {
+	t.Parallel()
 	dir, baseSHA, headSHA := setupGitRepo(t)
 	sctx := newTestContext(t, &mockAgent{name: "mock"}, dir, baseSHA, headSHA, config.Commands{})
 
@@ -100,6 +104,7 @@ func TestCustomGateStep_CommandSeesTrustedConfigBranchWithoutUnsetCredentials(t 
 // authorized, so the pipeline never starts one on its own initiative. The
 // fix-round tests below cover the authorized path.
 func TestCustomGateStep_CommandFailureParksForHuman(t *testing.T) {
+	t.Parallel()
 	dir, baseSHA, headSHA := setupGitRepo(t)
 	sctx := newTestContext(t, &mockAgent{name: "mock"}, dir, baseSHA, headSHA, config.Commands{})
 

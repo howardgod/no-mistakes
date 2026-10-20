@@ -26,8 +26,8 @@ func trustedSourceForRun(global *config.GlobalConfig, repo *db.Repo, run *db.Run
 	return branch, nil
 }
 
-// trustedFetch names the three callers of resolveTrustedSource, because each
-// one fetches the source branch differently.
+// trustedFetch names the three ways resolveTrustedSource fetches the source
+// branch, one per kind of caller.
 type trustedFetch int
 
 const (
@@ -37,25 +37,25 @@ const (
 	// fetchForRecovery fetches the worktree's own origin through the bounded
 	// recovery seam, as recovery always has.
 	fetchForRecovery
-	// fetchForPiPreflight imports into a private ref so a refused Pi profile
-	// cannot perturb the refs of an in-flight run it must not supersede.
-	fetchForPiPreflight
+	// fetchForPreflight imports into a private ref so a refused Pi profile or
+	// retry cannot perturb the refs of an in-flight run it must not supersede.
+	fetchForPreflight
 )
 
 // resolveTrustedSource is the single fetch/resolve/read path for run start,
-// recovery and the Pi preflight: fresh fetch, pinned SHA, readability check,
-// parse. A failed fetch never reads an old tracking ref and never falls back to
-// another branch.
-func resolveTrustedSource(ctx context.Context, dir string, repo *db.Repo, branch, runID string, mode trustedFetch) (string, *config.RepoConfig, error) {
+// recovery and the Pi and retry preflights: fresh fetch, pinned SHA,
+// readability check, parse. A failed fetch never reads an old tracking ref and
+// never falls back to another branch. purpose names the caller in errors.
+func resolveTrustedSource(ctx context.Context, dir string, repo *db.Repo, branch, runID string, mode trustedFetch, purpose string) (string, *config.RepoConfig, error) {
 	if strings.TrimSpace(branch) == "" {
-		return "", nil, assertGateTrustedConfigReadable(ctx, dir, "", "")
+		return "", nil, assertTrustedConfigReadable(ctx, dir, "", "", purpose)
 	}
 	ref := "refs/remotes/origin/" + branch
 	originURL, urlErr := git.GetRemoteURL(ctx, dir, "origin")
 	refreshed := repo.URLsVerified && (urlErr != nil || safeurl.Redact(originURL) != repo.UpstreamURL)
 	var err error
 	switch {
-	case mode == fetchForPiPreflight:
+	case mode == fetchForPreflight:
 		ref = fmt.Sprintf("refs/no-mistakes/pi-profile/%d-%d", os.Getpid(), time.Now().UnixNano())
 		defer func() {
 			_, _ = git.Run(context.WithoutCancel(ctx), dir, "update-ref", "--no-deref", "-d", ref)
@@ -73,13 +73,13 @@ func resolveTrustedSource(ctx context.Context, dir string, repo *db.Repo, branch
 		err = git.FetchRemoteBranch(ctx, dir, "origin", branch)
 	}
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to fetch trusted config source branch %q (refusing to run without reading the trusted config): %w", branch, err)
+		return "", nil, fmt.Errorf("cannot evaluate %s: failed to fetch trusted config source branch %q (refusing to run without reading the trusted config): %w", purpose, branch, err)
 	}
 	sha, err := git.ResolveRef(ctx, dir, ref)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to resolve trusted config source branch %q: %w", branch, err)
+		return "", nil, fmt.Errorf("cannot evaluate %s: failed to resolve trusted config source branch %q: %w", purpose, branch, err)
 	}
-	if err := assertGateTrustedConfigReadable(ctx, dir, branch, sha); err != nil {
+	if err := assertTrustedConfigReadable(ctx, dir, branch, sha, purpose); err != nil {
 		return "", nil, err
 	}
 	return sha, loadTrustedRepoConfig(ctx, dir, sha, runID), nil
