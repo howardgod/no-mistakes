@@ -706,6 +706,7 @@ A silent invocation is cancelled when this budget expires.
 A still-working invocation continues only when [`review_agent_working_timeout`](#review_agent_working_timeout) is set, under the same idle rule as [`agent_working_timeout`](#agent_working_timeout).
 When the invocation is cancelled, the review agent fails the run with a diagnostic naming the bound that cut it instead of remaining active indefinitely.
 That diagnostic carries the same measured evidence and adapter report described under [`agent_timeout`](#agent_timeout).
+A repository can tighten this value for itself with the trusted [`review.agent_timeout`](/no-mistakes/reference/repo-config/#reviewagent_timeout) key; the smaller of the two applies, and a repository can never raise it.
 
 |         |                        |
 | ------- | ---------------------- |

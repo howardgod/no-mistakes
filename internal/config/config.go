@@ -497,6 +497,14 @@ type ReviewRaw struct {
 	// at least one changed file; a run that touches nothing matching leaves
 	// the review prompt exactly as it is without this setting.
 	PathInstructions []PathInstruction `yaml:"path_instructions"`
+	// AgentTimeout is an optional per-repository Review invocation stall
+	// budget, a Go duration such as "10m". It can only tighten the global
+	// review_agent_timeout: a longer value is ignored, so a repository cannot
+	// weaken the machine's policy. Like the rest of this block it is honored
+	// ONLY from the trusted default-branch copy, because the pushed branch is
+	// the thing the timeout gates and must not be able to loosen, or choose,
+	// the budget of its own review.
+	AgentTimeout string `yaml:"agent_timeout"`
 }
 
 // PRRaw is the YAML representation of pull-request settings.
@@ -896,6 +904,13 @@ type Config struct {
 	Worktree                  Worktree
 	Commands                  Commands
 	CommandOverrides          map[string]CommandOverride
+	// ReviewAgentTimeoutTightened is set when the trusted repository's
+	// review.agent_timeout cut the Review budget below the global one. It is
+	// kept apart from AgentTimeoutsConfigured because that flag is read for
+	// every step: a repository that only shortens Review must not change the
+	// crash-retry eligibility of Document, Lint, or Test, whose budgets it did
+	// not touch. Read it through AgentTimeoutConfiguredFor.
+	ReviewAgentTimeoutTightened bool
 	// Gates are the repository's extra checks, already trusted-only by the
 	// time they reach here (EffectiveRepoConfig sourced them from the trusted
 	// default-branch copy).
@@ -3117,10 +3132,30 @@ func validatePRRaw(pr PRRaw) error {
 // invalid block has to fail here, before it merges, rather than brick the
 // repository's pipeline afterwards. Do not scope this to the trusted copy.
 func validateReviewRaw(review ReviewRaw) error {
+	if review.AgentTimeout != "" {
+		if _, err := parsePositiveDuration("review.agent_timeout", review.AgentTimeout); err != nil {
+			return err
+		}
+	}
 	if err := validatePathInstructionEntries(review.PathInstructions); err != nil {
 		return err
 	}
 	return validatePathInstructionsBudget([]PathInstructionSource{{Heading: ReviewPathInstructionsHeading, Entries: review.PathInstructions}})
+}
+
+// trustedReviewAgentTimeout returns the repository's review.agent_timeout, or 0
+// when it is unset. LoadRepoFromBytes already rejected an unparsable or
+// non-positive value, so a hand-built RepoConfig carrying one is treated as
+// unset: the global budget then stands, which can never loosen the policy.
+func trustedReviewAgentTimeout(review ReviewRaw) time.Duration {
+	if review.AgentTimeout == "" {
+		return 0
+	}
+	d, err := parsePositiveDuration("review.agent_timeout", review.AgentTimeout)
+	if err != nil {
+		return 0
+	}
+	return d
 }
 
 func validatePathInstructionEntries(entries []PathInstruction) error {
@@ -3837,6 +3872,14 @@ func (c *Config) AutoFixLimit(step types.StepName) int {
 	}
 }
 
+// AgentTimeoutConfiguredFor reports whether a timeout the operator configured
+// governs step, which makes a budget cut on it deliberate rather than a crash
+// worth a crash retry. The global timeouts apply to every step; a repository's
+// tightened review.agent_timeout applies to Review only.
+func (c *Config) AgentTimeoutConfiguredFor(step types.StepName) bool {
+	return c.AgentTimeoutsConfigured || (step == types.StepReview && c.ReviewAgentTimeoutTightened)
+}
+
 // Merge combines global and per-repo config. Per-repo agent values, including
 // ordered fallback lists, override global agent values when non-empty. Commands
 // and ignore patterns come from repo config only.
@@ -4026,6 +4069,15 @@ func merge(global *GlobalConfig, repo *RepoConfig, override *RepositoryOverride)
 		// trusted-only (EffectiveRepoConfig sourced it from the trusted copy).
 		DisableProjectSettings: repo.DisableProjectSettings,
 		NoCI:                   repo.NoCI,
+	}
+
+	// repo.Review is trusted-only (EffectiveRepoConfig). The repository value
+	// only ever tightens the global budget, and a tightened budget counts as a
+	// configured timeout for crash-retry purposes, like any other configured
+	// one, but only for the Review step whose budget it changed.
+	if repoTimeout := trustedReviewAgentTimeout(repo.Review); repoTimeout > 0 && repoTimeout < cfg.ReviewAgentTimeout {
+		cfg.ReviewAgentTimeout = repoTimeout
+		cfg.ReviewAgentTimeoutTightened = true
 	}
 
 	if override != nil {
