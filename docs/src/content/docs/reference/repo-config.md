@@ -457,7 +457,7 @@ A shorter stall budget for each Review-step agent invocation in this repository,
 |---|---|
 | Type | `string` (Go duration, positive) |
 | Default | unset (the global [`review_agent_timeout`](/no-mistakes/reference/global-config/#review_agent_timeout) applies) |
-| Trust | Read only from the trusted default branch |
+| Trust | Read only from the trusted config branch |
 
 ```yaml
 review:
@@ -466,7 +466,7 @@ review:
 
 **Precedence.** The effective budget is the smaller of this value and the global `review_agent_timeout`. A repository can only tighten the machine policy: a longer value is accepted but has no effect, and the global limit stays in force. An unset key keeps the global limit, so the setting is opt-in.
 
-**Trust boundary.** Commit it to your **default branch**, the same copy the daemon reads `review.conversation` and `review.path_instructions` from. A pushed branch cannot set, change, or remove it, because the timeout gates that branch's own review. A value that is not a positive duration fails the config closed, on the pushed copy too, so an invalid block is caught before it merges.
+**Trust boundary.** Commit it to your **trusted config branch**, the same copy the daemon reads `review.conversation` and `review.path_instructions` from. A pushed branch cannot set, change, or remove it, because the timeout gates that branch's own review. A value that is not a positive duration fails the config closed, on the pushed copy too, so an invalid block is caught before it merges.
 
 **What it does not change.** It sets the same per-invocation budget as `review_agent_timeout`: the reviewer, the fixer, and each fresh rereviewer get it independently, and an expiry fails the Review step exactly as before. It never skips Review or counts a timeout as a pass. It does not change [`review_agent_working_timeout`](/no-mistakes/reference/global-config/#review_agent_working_timeout), which stays global and still bounds how long a still-working invocation may continue past the budget. Because a tightened budget is a configured timeout, a Review invocation cut by it is not retried by `agent_crash_retries`, as with a configured global value. Only Review is affected: Document, Lint, and Test keep the crash retry their own, unchanged budgets earn. It is not an aggregate limit on the whole Review step.
 
