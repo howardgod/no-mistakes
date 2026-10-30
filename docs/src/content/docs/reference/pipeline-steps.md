@@ -333,7 +333,7 @@ Stores the PR URL in the database and streams it to the TUI.
 
 ### Pipeline step attestation
 
-Immediately after the existing `Updates from [git push no-mistakes](https://github.com/kunchenguid/no-mistakes)` signature, no-mistakes writes one stable HTML comment:
+Immediately after the `Updates from git push no-mistakes` signature line (linked by default; see [`pr.signature`](/no-mistakes/reference/repo-config/#prsignature)), no-mistakes writes one stable HTML comment:
 
 ```html
 <!-- no-mistakes-pipeline-attestation:v1 {"head_sha":"0123456789abcdef0123456789abcdef01234567","steps":[{"step":"review","status":"completed"}]} -->

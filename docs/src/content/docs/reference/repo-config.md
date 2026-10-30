@@ -63,7 +63,7 @@ disable_project_settings: true
 
 # Optional PR settings.
 # base_branch is read from the trusted config branch.
-# template, publish_intent, and appendix are trusted publication policy.
+# template, publish_intent, appendix, and signature are trusted publication policy.
 # appendix defaults to full. collapsed and minimal shorten the generated tail.
 # title_format is a repository convention and is read from this branch.
 pr:
@@ -71,6 +71,7 @@ pr:
   # template: .github/pull_request_template.md
   # publish_intent: false
   # appendix: collapsed # full | collapsed | minimal
+  # signature: plain # link | plain
   # title_format: "{{.Branch}}: {{.Title}}"
 
 auto_fix:
