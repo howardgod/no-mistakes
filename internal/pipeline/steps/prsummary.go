@@ -117,14 +117,14 @@ func BuildPipelineSummary(steps []*db.StepResult, rounds map[string][]*db.StepRo
 // Unknown, GitHub, GitLab, and Azure stay on today's HTML. Bitbucket Cloud is
 // no-HTML markdown: no attestation comment, no <details>.
 func BuildPipelineSummaryFor(steps []*db.StepResult, rounds map[string][]*db.StepRound, headSHA string, provider scm.Provider) (string, string) {
-	return buildPipelineSummaryFor(steps, rounds, headSHA, provider, pipelineAttestationPolicy{})
+	return buildPipelineSummaryFor(steps, rounds, headSHA, provider, pipelineAttestationPolicy{}, noMistakesPRSignature)
 }
 
 type pipelineAttestationPolicy struct {
 	AllowTestCommandOverride string
 }
 
-func buildPipelineSummaryFor(steps []*db.StepResult, rounds map[string][]*db.StepRound, headSHA string, provider scm.Provider, policy pipelineAttestationPolicy) (string, string) {
+func buildPipelineSummaryFor(steps []*db.StepResult, rounds map[string][]*db.StepRound, headSHA string, provider scm.Provider, policy pipelineAttestationPolicy, signature string) (string, string) {
 	if len(steps) == 0 {
 		return "", ""
 	}
@@ -156,7 +156,7 @@ func buildPipelineSummaryFor(steps []*db.StepResult, rounds map[string][]*db.Ste
 
 	var b strings.Builder
 	b.WriteString("## Pipeline\n\n")
-	b.WriteString(noMistakesPRSignature)
+	b.WriteString(signature)
 	b.WriteString("\n\n")
 	if flavor == prBodyHTML {
 		b.WriteString(buildPipelineAttestationWithPolicy(steps, rounds, headSHA, policy))

@@ -16,6 +16,23 @@ import (
 
 const testPipelineHeadSHA = "0123456789abcdef0123456789abcdef01234567"
 
+func TestBuildPipelineSummary_PlainSignaturePreservesEvidence(t *testing.T) {
+	t.Parallel()
+	steps := []*db.StepResult{{ID: "review", StepName: types.StepReview, Status: types.StepStatusCompleted}}
+	const linked = "Updates from [git push no-mistakes](https://github.com/kunchenguid/no-mistakes)"
+	const plain = "Updates from git push no-mistakes"
+	for _, provider := range []scm.Provider{scm.ProviderGitHub, scm.ProviderBitbucket} {
+		linkedMD, linkedRisk := BuildPipelineSummaryFor(steps, nil, testPipelineHeadSHA, provider)
+		if !strings.Contains(linkedMD, "\n"+linked+"\n") {
+			t.Fatalf("default signature changed:\n%s", linkedMD)
+		}
+		plainMD, plainRisk := buildPipelineSummaryFor(steps, nil, testPipelineHeadSHA, provider, pipelineAttestationPolicy{}, plain)
+		if want := strings.Replace(linkedMD, linked, plain, 1); plainMD != want || plainRisk != linkedRisk {
+			t.Fatalf("plain signature changed pipeline evidence:\n%s", plainMD)
+		}
+	}
+}
+
 func TestBuildPipelineSummary_AllClean(t *testing.T) {
 	t.Parallel()
 	steps := []*db.StepResult{

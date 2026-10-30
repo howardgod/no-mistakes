@@ -11,6 +11,20 @@ import (
 	"unicode/utf8"
 )
 
+const (
+	PRSignatureLink  = "link"
+	PRSignaturePlain = "plain"
+)
+
+func validatePRSignature(mode string) error {
+	switch mode {
+	case "", PRSignatureLink, PRSignaturePlain:
+		return nil
+	default:
+		return fmt.Errorf("pr.signature: %q is not a valid mode (want %q or %q)", mode, PRSignatureLink, PRSignaturePlain)
+	}
+}
+
 // ValidatePRTemplatePath accepts a literal repository-relative Git path, not a
 // filesystem path, glob, ref expression or URL. Empty leaves template mode off.
 // Keep this platform-independent: a Windows spelling is unsafe on POSIX too.

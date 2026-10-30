@@ -288,7 +288,7 @@ func TestAttestationOverrideReasonWithControlByteStaysValidJSON(t *testing.T) {
 		{ID: "test", StepName: types.StepTest, Status: types.StepStatusCompleted, OverrideReason: &reason},
 		{ID: "document", StepName: types.StepDocument, Status: types.StepStatusCompleted},
 	}
-	md, _ := buildPipelineSummaryFor(steps, nil, testPipelineHeadSHA, scm.ProviderGitHub, pipelineAttestationPolicy{AllowTestCommandOverride: "legacy \a"})
+	md, _ := buildPipelineSummaryFor(steps, nil, testPipelineHeadSHA, scm.ProviderGitHub, pipelineAttestationPolicy{AllowTestCommandOverride: "legacy \a"}, noMistakesPRSignature)
 	body := redactPRContent(prContent{Body: md}).Body
 	if body != md {
 		t.Fatalf("the publication boundary changed the attestation:\n%s\n%s", md, body)
