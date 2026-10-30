@@ -24,7 +24,7 @@ func TestBuildPipelineAttestation_CarriesTestCommandOverride(t *testing.T) {
 
 	md, _ := buildPipelineSummaryFor(steps, nil, testPipelineHeadSHA, scm.ProviderUnknown, pipelineAttestationPolicy{
 		AllowTestCommandOverride: allow,
-	})
+	}, noMistakesPRSignature)
 	attestation := parsePipelineAttestationForTest(t, md)
 
 	var testStep pipelineAttestationStep

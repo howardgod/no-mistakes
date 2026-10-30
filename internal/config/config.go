@@ -398,11 +398,11 @@ type RepoConfig struct {
 	// the pushed branch controls nothing that executes.
 	AllowRepoCommands bool `yaml:"allow_repo_commands"`
 	// PR carries pull-request settings. BaseBranch controls where a PR lands,
-	// Template, PublishIntent, and Appendix control trusted publication policy,
+	// Template, PublishIntent, Appendix, and Signature control trusted publication policy,
 	// and TitleFormat controls repository title convention. EffectiveRepoConfig
 	// keeps BaseBranch trusted-only unless the repository opts into pushed
 	// settings, leaves TitleFormat on the pushed branch, and keeps Template,
-	// PublishIntent, and Appendix trusted-only.
+	// PublishIntent, Appendix, and Signature trusted-only.
 	AutoFix AutoFixRaw `yaml:"auto_fix"`
 	CI      CIRaw      `yaml:"ci"`
 	// Rebase is gate-control: EffectiveRepoConfig keeps it trusted-only so a
@@ -514,12 +514,13 @@ type PRRaw struct {
 	// repository explicitly opts into pushed-branch settings with
 	// allow_repo_commands.
 	BaseBranch string `yaml:"base_branch"`
-	// Template, PublishIntent, and Appendix are repository-only publication
-	// policy. All three remain trusted-only even when allow_repo_commands is
-	// enabled. Appendix empty means full.
+	// Template, PublishIntent, Appendix, and Signature are repository-only
+	// publication policy. They remain trusted-only even when allow_repo_commands
+	// is enabled. Empty Appendix means full; empty Signature means link.
 	Template      string `yaml:"template"`
 	PublishIntent *bool  `yaml:"publish_intent"`
 	Appendix      string `yaml:"appendix"`
+	Signature     string `yaml:"signature"`
 	// TitleFormat controls PR title rendering when set. It is a non-executing
 	// repository convention and is therefore read from the pushed branch.
 	TitleFormat *string `yaml:"title_format"`
@@ -1036,7 +1037,9 @@ type PR struct {
 	// Nil preserves the historical default: publish the extracted intent.
 	PublishIntent *bool
 	// Appendix is full, collapsed, or minimal. Empty preserves full.
-	Appendix    string
+	Appendix string
+	// Signature is link or plain. Empty preserves link.
+	Signature   string
 	TitleFormat string
 }
 
@@ -3115,7 +3118,7 @@ func validatePRRaw(pr PRRaw) error {
 	if err := validatePRAppendix(pr.Appendix); err != nil {
 		return err
 	}
-	return nil
+	return validatePRSignature(pr.Signature)
 }
 
 // validateReviewRaw fails the config closed on a review.path_instructions list
@@ -3363,15 +3366,16 @@ func EffectiveRepoConfig(pushed, trusted *RepoConfig, allowRepoCommands bool) *R
 		// trusted-only unless the repository explicitly opts into pushed
 		// settings alongside commands and agent selection. TitleFormat is a
 		// non-executing convention and remains sourced from the pushed copy.
-		// pr.template, pr.publish_intent, and pr.appendix control public
-		// narrative policy, so they remain trusted-only regardless of the
-		// commands opt-in.
+		// pr.template, pr.publish_intent, pr.appendix, and pr.signature control
+		// public narrative policy, so they remain trusted-only regardless of
+		// the commands opt-in.
 		if !allowRepoCommands {
 			effective.PR.BaseBranch = trusted.PR.BaseBranch
 		}
 		effective.PR.Template = trusted.PR.Template
 		effective.PR.PublishIntent = trusted.PR.PublishIntent
 		effective.PR.Appendix = trusted.PR.Appendix
+		effective.PR.Signature = trusted.PR.Signature
 	} else {
 		effective.Document = DocumentRaw{}
 		effective.ProtectedPaths = nil
@@ -3393,6 +3397,7 @@ func EffectiveRepoConfig(pushed, trusted *RepoConfig, allowRepoCommands bool) *R
 		effective.PR.Template = ""
 		effective.PR.PublishIntent = nil
 		effective.PR.Appendix = ""
+		effective.PR.Signature = ""
 	}
 	if allowRepoCommands {
 		return &effective
@@ -3994,6 +3999,7 @@ func merge(global *GlobalConfig, repo *RepoConfig, override *RepositoryOverride)
 		Template:      repo.PR.Template,
 		PublishIntent: repo.PR.PublishIntent,
 		Appendix:      repo.PR.Appendix,
+		Signature:     repo.PR.Signature,
 	}
 	if override != nil {
 		if override.PR.TitleFormat != nil {

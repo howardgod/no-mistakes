@@ -773,7 +773,7 @@ func (s *PRStep) buildPipelineSectionFor(sctx *pipeline.StepContext, provider sc
 	if sctx.Config != nil {
 		policy.AllowTestCommandOverride = strings.TrimSpace(sctx.Config.Test.AllowApproveOverFailure)
 	}
-	pipelineMD, riskLine = buildPipelineSummaryFor(steps, rounds, sctx.Run.HeadSHA, provider, policy)
+	pipelineMD, riskLine = buildPipelineSummaryFor(steps, rounds, sctx.Run.HeadSHA, provider, policy, prSignature(sctx))
 	// The review conversation rides inside the Pipeline section as an ordinary
 	// `### ` group, so the existing body-budget logic can drop it whole rather
 	// than competing with the attestation it must never displace.

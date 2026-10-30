@@ -16,6 +16,13 @@ const (
 	validationDetailsClose = "\n</details>"
 )
 
+func prSignature(sctx *pipeline.StepContext) string {
+	if sctx != nil && sctx.Config != nil && sctx.Config.PR.Signature == config.PRSignaturePlain {
+		return "Updates from git push no-mistakes"
+	}
+	return noMistakesPRSignature
+}
+
 func appendixMode(sctx *pipeline.StepContext) string {
 	if sctx == nil || sctx.Config == nil {
 		return config.PRAppendixFull
@@ -25,10 +32,10 @@ func appendixMode(sctx *pipeline.StepContext) string {
 
 // appendixEvidence is the recorded Risk, Testing, and Pipeline tail.
 // Intent is the caller's job: it stays outside a collapsed Validation block.
-func appendixEvidence(mode string, flavor prBodyFlavor, risk, testing, pipeline string, provider scm.Provider) string {
-	switch mode {
+func appendixEvidence(sctx *pipeline.StepContext, flavor prBodyFlavor, risk, testing, pipeline string, provider scm.Provider) string {
+	switch appendixMode(sctx) {
 	case config.PRAppendixMinimal:
-		return minimalTail(risk, pipeline, provider)
+		return minimalTail(sctx, risk, pipeline, provider)
 	case config.PRAppendixCollapsed:
 		if flavor == prBodyHTML {
 			return wrapValidation(joinAppendixSections(risk, testing, pipeline, provider))
@@ -64,8 +71,8 @@ func wrapValidation(inner string) string {
 // attestation comment; this does not invent one. An owned Bitbucket body
 // carries that comment inside a text fence, and the fence is kept so the
 // marker stays visible there.
-func minimalTail(risk, pipelineMD string, provider scm.Provider) string {
-	return joinBlocks(oneLineRisk(neutralizeAttestationMarkers(provider, risk)), noMistakesPRSignature, carriedAttestation(pipelineMD))
+func minimalTail(sctx *pipeline.StepContext, risk, pipelineMD string, provider scm.Provider) string {
+	return joinBlocks(oneLineRisk(neutralizeAttestationMarkers(provider, risk)), prSignature(sctx), carriedAttestation(pipelineMD))
 }
 
 func oneLineRisk(risk string) string {
@@ -127,7 +134,7 @@ func assemblePRBody(sctx *pipeline.StepContext, whatChanged, riskLine, testingMD
 
 func assembleMinimalPRBody(sctx *pipeline.StepContext, whatChanged, riskLine, pipelineMD string, bodyLimit int, provider scm.Provider) string {
 	prefix := narrativeWithIntent(sctx, whatChanged)
-	tail := minimalTail(riskLine, pipelineMD, provider)
+	tail := minimalTail(sctx, riskLine, pipelineMD, provider)
 	full := joinBlocks(prefix, tail)
 	if bodyLimit <= 0 || scm.PRBodyLen(full) <= bodyLimit {
 		return full
@@ -163,7 +170,7 @@ func buildPRBodyWithin(body, riskLine, testingMD, pipelineMD string, sctx *pipel
 
 func buildMinimalPRBody(body, riskLine, pipelineMD string, sctx *pipeline.StepContext, maxBytes int, provider scm.Provider) string {
 	prefix := narrativeWithIntent(sctx, body)
-	tail := minimalTail(riskLine, pipelineMD, provider)
+	tail := minimalTail(sctx, riskLine, pipelineMD, provider)
 	full := joinBlocks(prefix, tail)
 	if len(full) <= maxBytes {
 		return full
