@@ -65,10 +65,11 @@ func TestTrustedConfigBranchJourney(t *testing.T) {
 		})
 	}
 
-	// Startup reads the source before any agent runs: an unparseable verify
-	// config stops the run instead of falling back to main or the pushed branch.
+	// Startup reads the source before any agent runs: a verify config that
+	// decodes as YAML but fails config validation stops the admitted run instead
+	// of falling back to main or the pushed branch.
 	t.Run("unparseable_source_fails_before_any_agent", func(t *testing.T) {
-		h, _ := setupTrustedSourceJourney(t, trustedSourceFixture{optIn: true, verifyConfig: "gates: [unterminated\n"}, trustedSourceScenario(t, false))
+		h, _ := setupTrustedSourceJourney(t, trustedSourceFixture{optIn: true, verifyConfig: "rebase:\n  strategy: bogus\n"}, trustedSourceScenario(t, false))
 		startTrustedSourceRun(t, h, true)
 		run := h.WaitForRun(trustedSourceBranch, 60*time.Second)
 		if run.Status != types.RunFailed {
@@ -81,6 +82,31 @@ func TestTrustedConfigBranchJourney(t *testing.T) {
 			t.Fatalf("agent ran %d turns after the trusted source could not be read", len(invs))
 		}
 		t.Logf("EVIDENCE failed run error: %s", deref(run.Error))
+	})
+
+	// A verify config that is not even YAML is refused by the pre-admission
+	// intent-check read of the same source: no run is admitted, no agent runs,
+	// and the refusal names verify rather than falling back to main.
+	t.Run("syntax_broken_source_is_refused_before_admission", func(t *testing.T) {
+		h, _ := setupTrustedSourceJourney(t, trustedSourceFixture{optIn: true, verifyConfig: "gates: [unterminated\n"}, trustedSourceScenario(t, false))
+		startTrustedSourceRun(t, h, true)
+		for _, run := range h.Runs() {
+			if run.Branch == trustedSourceBranch {
+				t.Fatalf("a run was admitted for %s despite the unreadable source: status=%s error=%q", trustedSourceBranch, run.Status, deref(run.Error))
+			}
+		}
+		if invs := h.AgentInvocations(); len(invs) != 0 {
+			t.Fatalf("agent ran %d turns after the trusted source could not be read", len(invs))
+		}
+		logData, err := os.ReadFile(paths.WithRoot(h.NMHome).DaemonLog())
+		if err != nil {
+			t.Fatal(err)
+		}
+		const want = `cannot evaluate intent check: trusted .no-mistakes.yaml on trusted source branch \"verify\"`
+		if !strings.Contains(string(logData), want) {
+			t.Fatalf("daemon log does not record the pre-admission refusal naming verify (want %s)", want)
+		}
+		t.Logf("EVIDENCE pre-admission refusal for the syntax-broken verify config found in daemon log")
 	})
 
 	// A daemon crash while the run is parked: recovery re-reads policy from the

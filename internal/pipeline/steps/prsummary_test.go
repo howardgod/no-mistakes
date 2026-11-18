@@ -1172,7 +1172,7 @@ func TestBuildPRTestingSummary_PutsEachAttachmentInItsOwnParagraph(t *testing.T)
 				"rec.mp4":   "https://github.com/user-attachments/assets/rec",
 			}
 
-			md := buildPRTestingSummary(steps, rounds, tt.upstreamURL, "abc123", t.TempDir(), "", nil, scm.ProviderUnknown, attachments)
+			md := buildPRTestingSummary(steps, rounds, tt.upstreamURL, "abc123", t.TempDir(), "", nil, scm.ProviderUnknown, attachments, true, "")
 
 			lines := strings.Split(md, "\n")
 			found := 0
@@ -1249,7 +1249,7 @@ func TestBuildPRTestingSummary_SeparatesDetailsFromAdjacentAttachments(t *testin
 				"rec.mp4":  "https://github.com/user-attachments/assets/rec",
 			}
 
-			md := buildPRTestingSummary(steps, rounds, "git@github.com:example/widgets.git", "abc123", t.TempDir(), "", nil, scm.ProviderUnknown, attachments)
+			md := buildPRTestingSummary(steps, rounds, "git@github.com:example/widgets.git", "abc123", t.TempDir(), "", nil, scm.ProviderUnknown, attachments, true, "")
 
 			if !strings.Contains(md, tt.want) {
 				t.Errorf("expected %q, got:\n%s", tt.want, md)

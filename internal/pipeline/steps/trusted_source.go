@@ -44,8 +44,8 @@ var alternateSourcePathInstructionsHeading = strings.Replace(config.ReviewPathIn
 // trustedPathInstructionsHeading returns heading unchanged except for the
 // trusted repository source of an alternate-source run. Operator sources never
 // came from a branch, so their headings stay as they are.
-func trustedPathInstructionsHeading(sctx *pipeline.StepContext, heading string) string {
-	if heading == config.ReviewPathInstructionsHeading && trustedSourceIsAlternate(sctx) {
+func trustedPathInstructionsHeading(alternateSource bool, heading string) string {
+	if heading == config.ReviewPathInstructionsHeading && alternateSource {
 		return alternateSourcePathInstructionsHeading
 	}
 	return heading

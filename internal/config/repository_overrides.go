@@ -32,6 +32,12 @@ func normalizeRepositoryOverrides(raw RepositoryOverrides) (RepositoryOverrides,
 		}); err != nil {
 			return nil, fmt.Errorf("invalid repository_overrides.%s.pr: %w", key, err)
 		}
+		if err := validatePRUpdateText(override.PR.UpdateText); err != nil {
+			return nil, fmt.Errorf("invalid repository_overrides.%s.pr: %w", key, err)
+		}
+		if err := validateReviewAgents(override.ReviewAgents); err != nil {
+			return nil, fmt.Errorf("invalid repository_overrides.%s: %w", key, err)
+		}
 		seen := make(map[string]bool, len(override.TrustedConfigBranches))
 		for _, branch := range override.TrustedConfigBranches {
 			if branch == "" || branch != strings.TrimSpace(branch) {
