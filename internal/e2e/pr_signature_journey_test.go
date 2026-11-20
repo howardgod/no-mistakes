@@ -24,12 +24,11 @@ const (
 // TestPRSignatureJourney drives pr.signature through the real binary, daemon,
 // gate hook, and the stateful gh stub, reading each PR body back as published:
 //
-//   - no pr.signature keeps today's linked line;
-//   - pr.signature: plain committed only on the pushed branch is ignored, even
+//   - no pr.signature writes the plain line with no link, in the full and
+//     minimal appendix and in a pr.template appendix;
+//   - pr.signature: link committed only on the pushed branch is ignored, even
 //     with allow_repo_commands: true on the trusted branch;
-//   - pr.signature: plain on the trusted default branch writes the plain line
-//     with no link, in the full and minimal appendix and in a pr.template
-//     appendix;
+//   - pr.signature: link on the trusted default branch writes the linked line;
 //   - an unrecognized pr.signature on the trusted branch fails the run closed.
 func TestPRSignatureJourney(t *testing.T) {
 	h := NewHarness(t, SetupOpts{Agent: "claude"})
@@ -84,27 +83,27 @@ func TestPRSignatureJourney(t *testing.T) {
 
 	setTrustedConfig("", "trusted config without pr.signature")
 	startRun("feature/sig-default", "")
-	assertLinked("default", publishedBody("feature/sig-default", "01-default-linked.md"))
+	assertPlain("default, full appendix", publishedBody("feature/sig-default", "01-default-plain-full.md"))
 
-	startRun("feature/sig-pushed-only", baseConfig+"pr:\n  signature: plain\n")
-	assertLinked("pushed-only plain", publishedBody("feature/sig-pushed-only", "02-pushed-only-plain-ignored.md"))
+	startRun("feature/sig-pushed-only", baseConfig+"pr:\n  signature: link\n")
+	assertPlain("pushed-only link", publishedBody("feature/sig-pushed-only", "02-pushed-only-link-ignored.md"))
 
-	setTrustedConfig("pr:\n  signature: plain\n", "trusted pr.signature plain")
-	startRun("feature/sig-plain", "")
-	assertPlain("trusted plain, full appendix", publishedBody("feature/sig-plain", "03-trusted-plain-full.md"))
-
-	setTrustedConfig("pr:\n  signature: plain\n  appendix: minimal\n", "trusted pr.signature plain minimal")
-	startRun("feature/sig-plain-minimal", "")
-	assertPlain("trusted plain, minimal appendix", publishedBody("feature/sig-plain-minimal", "04-trusted-plain-minimal.md"))
+	setTrustedConfig("pr:\n  appendix: minimal\n", "trusted minimal appendix without pr.signature")
+	startRun("feature/sig-default-minimal", "")
+	assertPlain("default, minimal appendix", publishedBody("feature/sig-default-minimal", "03-default-plain-minimal.md"))
 
 	h.CommitChange("main", ".github/pr_template.md", "## Overview\n\nDescribe the change.\n", "add PR template")
-	setTrustedConfig("pr:\n  signature: plain\n  template: .github/pr_template.md\n  appendix: collapsed\n", "trusted pr.signature plain template")
-	startRun("feature/sig-plain-template", "")
-	templateBody := publishedBody("feature/sig-plain-template", "05-trusted-plain-template-collapsed.md")
-	assertPlain("trusted plain, template collapsed appendix", templateBody)
+	setTrustedConfig("pr:\n  template: .github/pr_template.md\n  appendix: collapsed\n", "trusted template without pr.signature")
+	startRun("feature/sig-default-template", "")
+	templateBody := publishedBody("feature/sig-default-template", "04-default-plain-template-collapsed.md")
+	assertPlain("default, template collapsed appendix", templateBody)
 	if !strings.Contains(templateBody, "<!-- no-mistakes-pr-appendix:v1 ") {
 		t.Errorf("template run did not render the owned template appendix; body:\n%s", templateBody)
 	}
+
+	setTrustedConfig("pr:\n  signature: link\n", "trusted pr.signature link")
+	startRun("feature/sig-link", "")
+	assertLinked("trusted link, full appendix", publishedBody("feature/sig-link", "05-trusted-link-full.md"))
 
 	setTrustedConfig("pr:\n  signature: Plain\n", "trusted pr.signature invalid")
 	out, err := axiRun("feature/sig-invalid", "")

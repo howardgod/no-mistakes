@@ -36,7 +36,7 @@ func TestPRSignature_Publication(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					pushed := &config.RepoConfig{PR: config.PRRaw{Signature: config.PRSignaturePlain}}
+					pushed := &config.RepoConfig{PR: config.PRRaw{Signature: config.PRSignatureLink}}
 					sctx.Config.PR = config.Merge(config.DefaultGlobalConfig(), config.EffectiveRepoConfig(pushed, trusted, true)).PR
 					env, _ := fakeGH(t, "")
 					bodyFile := filepath.Join(t.TempDir(), "body.md")
@@ -59,12 +59,11 @@ func TestPRSignature_Publication(t *testing.T) {
 						evidence = parts.appendix
 					}
 					t.Logf("signature %q published body:\n%s", signature, body)
-					want := linked
-					if signature == config.PRSignaturePlain {
-						want = plain
-						if strings.Contains(body, "https://github.com/kunchenguid/no-mistakes") {
-							t.Fatalf("plain publication retained the project link:\n%s", body)
-						}
+					want := plain
+					if signature == config.PRSignatureLink {
+						want = linked
+					} else if strings.Contains(body, "https://github.com/kunchenguid/no-mistakes") {
+						t.Fatalf("signature %q publication retained the project link:\n%s", signature, body)
 					}
 					if strings.Count("\n"+evidence+"\n", "\n"+want+"\n") != 1 {
 						t.Fatalf("signature %q missing or duplicated:\n%s", signature, evidence)
@@ -75,13 +74,13 @@ func TestPRSignature_Publication(t *testing.T) {
 					switch signature {
 					case "":
 						defaultBody, defaultEvidence = body, evidence
-					case config.PRSignatureLink:
-						if body != defaultBody {
-							t.Fatal("explicit link differs byte-for-byte from the default")
-						}
 					case config.PRSignaturePlain:
-						if evidence != strings.Replace(defaultEvidence, linked, plain, 1) {
-							t.Fatal("plain mode changed more than the signature in the evidence")
+						if body != defaultBody {
+							t.Fatal("explicit plain differs byte-for-byte from the default")
+						}
+					case config.PRSignatureLink:
+						if evidence != strings.Replace(defaultEvidence, plain, linked, 1) {
+							t.Fatal("link mode changed more than the signature in the evidence")
 						}
 					}
 				}

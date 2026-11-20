@@ -75,7 +75,7 @@ pr:
   #   format: brief # raw (default) | brief
   #   sections: [why, scope, out_of_scope]
   # appendix: collapsed # full | collapsed | minimal
-  # signature: plain # link | plain
+  # signature: link # plain (default) | link
   # title_format: "{{.Branch}}: {{.Title}}"
 
 auto_fix:
@@ -365,18 +365,20 @@ Choose the generated PR body's signature line, independently of `pr.template` an
 | --- | --- |
 | Type | `string` |
 | Values | `link`, `plain` |
-| Default | `link` (missing or empty also preserves the default) |
+| Default | `plain` (missing or empty also means `plain`) |
 | Trust | Trusted config branch only, regardless of `allow_repo_commands` |
 
-`link` preserves the existing line exactly: `Updates from [git push no-mistakes](https://github.com/kunchenguid/no-mistakes)`.
+`plain` writes exactly `Updates from git push no-mistakes`, without a link to the no-mistakes project.
 
-`plain` writes exactly `Updates from git push no-mistakes`, without a link. It applies to ordinary PR bodies and template appendices in all three appendix modes. It does not remove the signature, rewrite author text, or change the pipeline attestation.
+`link` opts into the linked line: `Updates from [git push no-mistakes](https://github.com/kunchenguid/no-mistakes)`.
 
-An unrecognized value fails config parsing. The bundled `require-no-mistakes` action requires the linked signature; repositories using that check must keep `link` unless their enforcement action supports the plain line. This setting does not change the action.
+Either mode applies to ordinary PR bodies and template appendices in all three appendix modes. It does not remove the signature, rewrite author text, or change the pipeline attestation.
+
+An unrecognized value fails config parsing. The bundled `require-no-mistakes` action requires the linked signature; repositories using that check must set `link`. This setting does not change the action.
 
 ```yaml
 pr:
-  signature: plain
+  signature: link
 ```
 
 ### pr.title_format
