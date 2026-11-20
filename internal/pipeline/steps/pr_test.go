@@ -88,7 +88,7 @@ func TestPRStep_UpdatesExistingPR(t *testing.T) {
 	if !strings.Contains(ghLog, "--body") {
 		t.Errorf("expected the PR body in the gh api PATCH, got:\n%s", ghLog)
 	}
-	if !strings.Contains(ghLog, noMistakesPRSignature) {
+	if !strings.Contains(ghLog, plainNoMistakesPRSignature) {
 		t.Errorf("expected updated PR body to include no-mistakes signature, got:\n%s", ghLog)
 	}
 

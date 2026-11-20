@@ -16,11 +16,13 @@ const (
 	validationDetailsClose = "\n</details>"
 )
 
+// prSignature defaults to the plain line; only an explicit trusted
+// pr.signature: link writes the linked line.
 func prSignature(sctx *pipeline.StepContext) string {
-	if sctx != nil && sctx.Config != nil && sctx.Config.PR.Signature == config.PRSignaturePlain {
-		return "Updates from git push no-mistakes"
+	if sctx != nil && sctx.Config != nil && sctx.Config.PR.Signature == config.PRSignatureLink {
+		return noMistakesPRSignature
 	}
-	return noMistakesPRSignature
+	return plainNoMistakesPRSignature
 }
 
 func appendixMode(sctx *pipeline.StepContext) string {

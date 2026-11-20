@@ -603,7 +603,7 @@ type PRRaw struct {
 	// Template, PublishIntent, Appendix, Signature, and Intent remain
 	// trusted-only even when allow_repo_commands is enabled. An empty Appendix
 	// inherits machine-local defaults, falling back to full; Signature is
-	// repository-only and empty means link.
+	// repository-only and empty means plain.
 	Template      string      `yaml:"template"`
 	PublishIntent *bool       `yaml:"publish_intent"`
 	Appendix      string      `yaml:"appendix"`
@@ -1147,7 +1147,7 @@ type PR struct {
 	PublishIntent *bool
 	// Appendix is full, collapsed, or minimal. Empty preserves full.
 	Appendix string
-	// Signature is link or plain. Empty preserves link.
+	// Signature is link or plain. Empty means plain.
 	Signature string
 	// UpdateText is keep or regenerate. Empty means regenerate. It is set only
 	// from a matching repository_overrides entry.

@@ -37,6 +37,7 @@ const (
 	maxEmbeddedArtifactBytes               = 16 * 1024
 	maxEmbeddedArtifactsTotalBytes         = 32 * 1024
 	noMistakesPRSignature                  = "Updates from [git push no-mistakes](https://github.com/kunchenguid/no-mistakes)"
+	plainNoMistakesPRSignature             = "Updates from git push no-mistakes"
 	pipelineAttestationCommentPrefix       = "<!-- no-mistakes-pipeline-attestation:v1 "
 	pipelineAttestationCommentClosingToken = " -->"
 	// escapedPipelineAttestationCommentPrefix keeps an embedded copy readable

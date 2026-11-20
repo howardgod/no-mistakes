@@ -9,12 +9,12 @@ import (
 func TestPRPublicationPolicyTrustedEvenWithCommandsOptIn(t *testing.T) {
 	t.Parallel()
 	no, yes := false, true
-	pushed := &RepoConfig{PR: PRRaw{BaseBranch: "feature-base", Template: "evil.md", PublishIntent: &yes, Appendix: PRAppendixMinimal, Signature: PRSignaturePlain}}
-	trusted := &RepoConfig{PR: PRRaw{BaseBranch: "trusted-base", Template: ".github/pull_request_template.md", PublishIntent: &no, Appendix: PRAppendixCollapsed, Signature: PRSignatureLink}}
+	pushed := &RepoConfig{PR: PRRaw{BaseBranch: "feature-base", Template: "evil.md", PublishIntent: &yes, Appendix: PRAppendixMinimal, Signature: PRSignatureLink}}
+	trusted := &RepoConfig{PR: PRRaw{BaseBranch: "trusted-base", Template: ".github/pull_request_template.md", PublishIntent: &no, Appendix: PRAppendixCollapsed, Signature: PRSignaturePlain}}
 	for _, allow := range []bool{false, true} {
 		got := EffectiveRepoConfig(pushed, trusted, allow)
 		cfg := Merge(DefaultGlobalConfig(), got)
-		if cfg.PR.Template != trusted.PR.Template || cfg.PR.PublishesIntent() || cfg.PR.AppendixMode() != PRAppendixCollapsed || cfg.PR.Signature != PRSignatureLink {
+		if cfg.PR.Template != trusted.PR.Template || cfg.PR.PublishesIntent() || cfg.PR.AppendixMode() != PRAppendixCollapsed || cfg.PR.Signature != PRSignaturePlain {
 			t.Fatalf("allow=%v: pushed publication policy won: %+v", allow, cfg.PR)
 		}
 		wantBase := "trusted-base"
@@ -31,11 +31,11 @@ func TestPRPublicationPolicyTrustedEvenWithCommandsOptIn(t *testing.T) {
 			}
 		}
 		got = EffectiveRepoConfig(nil, trusted, allow)
-		if got.PR.Template != trusted.PR.Template || got.PR.PublishIntent == nil || *got.PR.PublishIntent || got.PR.Appendix != PRAppendixCollapsed || got.PR.Signature != PRSignatureLink {
+		if got.PR.Template != trusted.PR.Template || got.PR.PublishIntent == nil || *got.PR.PublishIntent || got.PR.Appendix != PRAppendixCollapsed || got.PR.Signature != PRSignaturePlain {
 			t.Fatalf("allow=%v: trusted policy lost when pushed copy absent", allow)
 		}
 	}
-	if pushed.PR.Template != "evil.md" || !*pushed.PR.PublishIntent || pushed.PR.Appendix != PRAppendixMinimal || pushed.PR.Signature != PRSignaturePlain {
+	if pushed.PR.Template != "evil.md" || !*pushed.PR.PublishIntent || pushed.PR.Appendix != PRAppendixMinimal || pushed.PR.Signature != PRSignatureLink {
 		t.Fatal("trust merge mutated caller input")
 	}
 }
@@ -75,7 +75,7 @@ func TestLoadRepo_PRSignature(t *testing.T) {
 			t.Fatalf("mode %q: %v", mode, err)
 		}
 		for _, allow := range []bool{false, true} {
-			pushed := &RepoConfig{PR: PRRaw{Signature: PRSignaturePlain}}
+			pushed := &RepoConfig{PR: PRRaw{Signature: PRSignatureLink}}
 			effective := EffectiveRepoConfig(pushed, repo, allow)
 			if got := Merge(DefaultGlobalConfig(), effective).PR.Signature; got != mode {
 				t.Fatalf("mode %q, allow=%v resolved to %q", mode, allow, got)
