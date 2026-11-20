@@ -206,6 +206,10 @@ CLI would need to stay attached to every run.
 
 The worktree is where `no-mistakes` can safely rebase, run commands, let the
 agent edit files, and commit fixes. Your day-to-day working tree stays clean.
+Each run worktree sets `core.trustctime=false` in its own config, so a file
+whose ctime the filesystem changes after Git wrote it (WSL `/mnt/c`, antivirus,
+indexers) does not make `git rebase` or `git merge` report local changes that
+do not exist.
 
 ## Component overview
 

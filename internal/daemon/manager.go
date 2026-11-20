@@ -1879,6 +1879,11 @@ func (m *RunManager) startRunWithIntentSourceLocked(ctx context.Context, repo *d
 		trackStartFailure("configure_worktree_identity")
 		return "", fmt.Errorf("configure worktree git identity: %w", err)
 	}
+	if err := git.DisableCtimeTrust(ctx, wtDir); err != nil {
+		m.db.UpdateRunError(run.ID, fmt.Sprintf("configure worktree ctime check: %s", err))
+		trackStartFailure("configure_worktree_ctime")
+		return "", fmt.Errorf("configure worktree ctime check: %w", err)
+	}
 	if storedPRBaseBranch != "" {
 		if err := steps.VerifyRemoteBranchExists(ctx, wtDir, storedPRBaseBranch); err != nil {
 			m.db.UpdateRunError(run.ID, err.Error())
