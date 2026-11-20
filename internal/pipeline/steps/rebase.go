@@ -422,6 +422,20 @@ func tryRebase(ctx context.Context, sctx *pipeline.StepContext, targetRef string
 	return nil, nil
 }
 
+// maxGitErrorChars bounds the git error text carried into a failure message so
+// a command that lists many files cannot flood the run record.
+const maxGitErrorChars = 1000
+
+// boundedGitError returns git's own error text (git.Run already appends the
+// redacted stderr) trimmed and cut to maxGitErrorChars runes.
+func boundedGitError(err error) string {
+	text := strings.TrimSpace(err.Error())
+	if r := []rune(text); len(r) > maxGitErrorChars {
+		return string(r[:maxGitErrorChars]) + "..."
+	}
+	return text
+}
+
 // rebaseWithAgent performs a rebase and uses the agent to resolve any conflicts.
 func rebaseWithAgent(ctx context.Context, sctx *pipeline.StepContext, targetRef string) error {
 	skip, err := shouldSkipRebase(ctx, sctx, targetRef)
@@ -433,13 +447,14 @@ func rebaseWithAgent(ctx context.Context, sctx *pipeline.StepContext, targetRef 
 	}
 
 	sctx.Log(fmt.Sprintf("rebasing onto %s...", targetRef))
-	if _, err := git.Run(ctx, sctx.WorkDir, "-c", "rerere.enabled=false", "rebase", targetRef); err == nil {
+	_, rebaseErr := git.Run(ctx, sctx.WorkDir, "-c", "rerere.enabled=false", "rebase", targetRef)
+	if rebaseErr == nil {
 		return nil
 	}
 
 	if len(rebaseConflictFiles(ctx, sctx.WorkDir)) == 0 {
 		_, _ = git.Run(ctx, sctx.WorkDir, "rebase", "--abort")
-		return fmt.Errorf("rebase onto %s failed (no conflicts detected)", targetRef)
+		return fmt.Errorf("rebase onto %s failed (no conflicts detected): %s", targetRef, boundedGitError(rebaseErr))
 	}
 	sctx.Log("conflicts detected, asking agent to resolve...")
 	conflictFiles := rebaseConflictFiles(ctx, sctx.WorkDir)
@@ -578,14 +593,15 @@ func mergeWithAgent(ctx context.Context, sctx *pipeline.StepContext, targetRef s
 	}
 
 	sctx.Log(fmt.Sprintf("merging %s...", targetRef))
-	if _, err := git.Run(ctx, sctx.WorkDir, mergeArgs(targetRef)...); err == nil {
+	_, mergeErr := git.Run(ctx, sctx.WorkDir, mergeArgs(targetRef)...)
+	if mergeErr == nil {
 		return nil
 	}
 
 	conflictFiles := rebaseConflictFiles(ctx, sctx.WorkDir)
 	if len(conflictFiles) == 0 {
 		_, _ = git.Run(ctx, sctx.WorkDir, "merge", "--abort")
-		return fmt.Errorf("merge %s failed (no conflicts detected)", targetRef)
+		return fmt.Errorf("merge %s failed (no conflicts detected): %s", targetRef, boundedGitError(mergeErr))
 	}
 	sctx.Log("conflicts detected, asking agent to resolve...")
 

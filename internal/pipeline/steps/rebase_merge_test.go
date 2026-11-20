@@ -605,3 +605,27 @@ func TestRebaseStep_MergeStrategyConflictedRebaseLeftInProgressIsAbortedAndFails
 	}
 	assertRestoredToReviewedHead(t, f.dir, f.headSHA)
 }
+
+// A non-conflict failure while fixing must carry git's own error text, so a
+// failure like "would be overwritten" is diagnosable from the run record.
+func TestRebaseStep_NonConflictFailureCarriesGitError(t *testing.T) {
+	t.Parallel()
+	for _, strategy := range []string{"", config.RebaseStrategyMerge} {
+		t.Run("strategy="+strategy, func(t *testing.T) {
+			t.Parallel()
+			f := newMergeFixture(t, false)
+			// An untracked file at a path origin/main added blocks the checkout.
+			writeFixtureFile(t, f.dir, "main.txt", "local\n")
+			sctx := f.context(t, &mockAgent{name: "test"}, strategy)
+			sctx.Fixing = true
+
+			_, err := (&RebaseStep{}).Execute(sctx)
+			if err == nil {
+				t.Fatal("expected the blocked integration to fail")
+			}
+			if !strings.Contains(err.Error(), "no conflicts detected") || !strings.Contains(err.Error(), "main.txt") {
+				t.Fatalf("error does not carry git's text naming main.txt: %v", err)
+			}
+		})
+	}
+}
