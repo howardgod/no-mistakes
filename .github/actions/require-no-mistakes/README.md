@@ -7,7 +7,9 @@ repositories can call it instead of copying the shell into their own workflow.
 
 It verifies, in order:
 
-1. the PR body carries the no-mistakes signature line;
+1. the PR body carries the linked no-mistakes signature line, which
+   no-mistakes writes only when the trusted repository config sets
+   `pr.signature: link` (the default `plain` line does not pass);
 2. the body carries a parseable `<!-- no-mistakes-pipeline-attestation:v1 {...} -->`
    comment;
 3. the attestation's `head_sha` equals the PR head SHA, so a later push cannot
