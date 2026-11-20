@@ -6,6 +6,7 @@ Thanks for wanting to contribute. One rule up front:
 
 This repo _is_ no-mistakes. Contributions should be done using the tool itself, which reduces the maintainer's burden of reviewing and merging contributions.
 The `Require no-mistakes` GitHub Actions workflow runs on every PR and fails if the body is missing the deterministic signature and structured pipeline step attestation that no-mistakes writes. PRs without them will not be reviewed or merged.
+The check accepts only the linked signature line, which no-mistakes writes only under [`pr.signature: link`](docs/src/content/docs/reference/repo-config.md#prsignature). This repository's `.no-mistakes.yaml` leaves the `plain` default, so on this fork the check fails; it is not a required check here.
 If you revise the PR description after no-mistakes creates it, preserve the generated `## Pipeline` section. Replacing the whole body removes the signature or attestation and makes the required check fail until no-mistakes writes the section again.
 
 Every `opened` or `edited` event gets an independent run, including first-time-fork runs that become actionable through GitHub's normal approval process. The integration contract for consumers such as Wheelhouse is:
