@@ -728,21 +728,43 @@ func CopyLocalUserIdentity(ctx context.Context, srcDir, dstDir string) error {
 		if value == "" {
 			continue
 		}
-		if _, err := Run(ctx, dstDir, "config", "--worktree", key, value); err != nil {
-			if !isWorktreeConfigWriteUnavailable(err) {
-				return err
-			}
-			// Per-worktree config is not usable here (Git too old for the
-			// flag, or the repo has multiple worktrees without
-			// extensions.worktreeConfig enabled). Fall back to the shared
-			// local config. Such gates also lack per-worktree isolation, so
-			// this matches the legacy behavior.
-			if _, err := Run(ctx, dstDir, "config", "--local", key, value); err != nil {
-				return err
-			}
+		if err := setWorktreeConfig(ctx, dstDir, key, value); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+// DisableCtimeTrust sets core.trustctime=false in dir's per-worktree config,
+// with the same --local fallback as CopyLocalUserIdentity.
+//
+// A run worktree on a filesystem that changes a file's ctime after Git wrote
+// it (WSL drvfs under /mnt/c, antivirus scanners, file indexers) otherwise
+// makes `git rebase` and `git merge` refuse with "Your local changes to the
+// following files would be overwritten" although nothing is dirty: those
+// commands reread the index and compare stat data only, and with Git's default
+// core.trustctime=true a ctime that moved past the recorded second counts as a
+// change. Every content change in a run worktree also moves mtime or size, so
+// ctime adds no protection there.
+func DisableCtimeTrust(ctx context.Context, dir string) error {
+	return setWorktreeConfig(ctx, dir, "core.trustctime", "false")
+}
+
+// setWorktreeConfig writes key=value into dir's per-worktree config, falling
+// back to the shared local config when per-worktree config is not usable here
+// (Git too old for the flag, or the repo has multiple worktrees without
+// extensions.worktreeConfig enabled). Such gates also lack per-worktree
+// isolation, so the fallback matches the legacy behavior.
+func setWorktreeConfig(ctx context.Context, dir, key, value string) error {
+	_, err := Run(ctx, dir, "config", "--worktree", key, value)
+	if err == nil {
+		return nil
+	}
+	if !isWorktreeConfigWriteUnavailable(err) {
+		return err
+	}
+	_, err = Run(ctx, dir, "config", "--local", key, value)
+	return err
 }
 
 // isWorktreeConfigWriteUnavailable reports whether a `git config --worktree`
