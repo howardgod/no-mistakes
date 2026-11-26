@@ -215,7 +215,8 @@ func newAxiRunCmd() *cobra.Command {
 			"usual appendix (Intent, evidence in the pr.appendix mode, Issues) and the\n" +
 			"attestation follow the description. Either works alone; the other is\n" +
 			"drafted. pr.title_format applies to a supplied title. Under pr.template\n" +
-			"the description must keep the template's top-level # headings. A supplied\n" +
+			"the description must keep the template's top-level # headings; under\n" +
+			"pr.user_template, its headings at the highest level it uses. A supplied\n" +
 			"description is owned author text that later runs keep byte for byte. On\n" +
 			"an existing PR neither is applied. Empty, oversized, multi-line titles,\n" +
 			"control or bidi characters, and no-mistakes markers are refused before any\n" +

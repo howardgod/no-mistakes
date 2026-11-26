@@ -414,9 +414,14 @@ type OperatorReviewRaw struct {
 }
 
 // GlobalPRRaw contains machine-wide PR presentation defaults.
-// Template and PublishIntent are deliberately not machine-wide settings.
+// PublishIntent and the repository-relative Template are deliberately not
+// machine-wide settings. UserTemplate is the operator's own template: a file
+// under <NM_HOME>/pr-templates that, when set, wins over every repository's
+// pr.template. Only the global config can name it, so no repository can make
+// the daemon publish a file from the operator's disk.
 type GlobalPRRaw struct {
-	Appendix string `yaml:"appendix"`
+	Appendix     string `yaml:"appendix"`
+	UserTemplate string `yaml:"user_template"`
 }
 
 // RepositoryPRRaw contains machine-local per-repository PR defaults.
@@ -1142,7 +1147,10 @@ type OriginProvider struct {
 type PR struct {
 	BaseBranch string
 	Template   string
-	Intent     PRIntent
+	// UserTemplate names a file under <NM_HOME>/pr-templates from the global
+	// config. When set it wins over Template; see GlobalPRRaw.
+	UserTemplate string
+	Intent       PRIntent
 	// Nil preserves the historical default: publish the extracted intent.
 	PublishIntent *bool
 	// Appendix is full, collapsed, or minimal. Empty preserves full.
@@ -2867,6 +2875,9 @@ func LoadGlobalFromBytes(data []byte) (*GlobalConfig, error) {
 	if err := validatePRAppendix(raw.PR.Appendix); err != nil {
 		return nil, fmt.Errorf("parse global config: %w", err)
 	}
+	if err := ValidatePRUserTemplatePath(raw.PR.UserTemplate); err != nil {
+		return nil, fmt.Errorf("parse global config: %w", err)
+	}
 	if err := validateIntentCheck(&raw.Intent.Check); err != nil {
 		return nil, fmt.Errorf("parse global config: %w", err)
 	}
@@ -4338,6 +4349,7 @@ func merge(global *GlobalConfig, repo *RepoConfig, override *RepositoryOverride)
 	pr := PR{
 		BaseBranch:    strings.TrimSpace(repo.PR.BaseBranch),
 		Template:      repo.PR.Template,
+		UserTemplate:  global.PR.UserTemplate,
 		Intent:        PRIntent{Format: repo.PR.Intent.Format, Sections: append([]string(nil), repo.PR.Intent.Sections...)},
 		PublishIntent: repo.PR.PublishIntent,
 		Appendix:      repo.PR.Appendix,

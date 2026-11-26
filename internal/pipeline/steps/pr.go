@@ -155,12 +155,12 @@ func (s *PRStep) Execute(sctx *pipeline.StepContext) (*pipeline.StepOutcome, err
 	// Capture live author content before model drafting. An unreadable
 	// provider cannot promise template preservation.
 	var template string
-	if name := configuredPRTemplate(sctx); name != "" {
+	if prTemplateConfigured(sctx) {
 		if _, ok := host.(scm.PRContentReader); !ok {
-			return nil, fmt.Errorf("pr.template requires raw PR content reads; this provider is unsupported")
+			return nil, fmt.Errorf("pr.template and pr.user_template require raw PR content reads; this provider is unsupported")
 		}
 		var err error
-		template, err = loadPRTemplate(ctx, sctx.WorkDir, sctx.Config.TrustedConfigSHA, name)
+		template, err = loadConfiguredPRTemplate(ctx, sctx)
 		if err != nil {
 			return nil, err
 		}
@@ -203,7 +203,7 @@ func (s *PRStep) Execute(sctx *pipeline.StepContext) (*pipeline.StepOutcome, err
 		// Removing pr.template must not switch an already owned body back to
 		// destructive drafting. Its live author narrative still wins.
 		// update_text: keep uses that same path when no template is configured.
-		if template != "" || hasPRAppendixMarkers(live.Body) || keepsPRUpdateText(sctx) {
+		if (template != "" || hasPRAppendixMarkers(live.Body) || keepsPRUpdateText(sctx)) && !regeneratesLegacyPRBody(sctx, live.Body) {
 			if _, err := parsePROwnedBody(live.Body); err != nil {
 				if errors.Is(err, errUnownedLegacyAttestation) && template == "" && keepsPRUpdateText(sctx) {
 					return nil, fmt.Errorf("existing PR has an unowned legacy attestation; explicitly separate its generated evidence from the narrative once before using pr.update_text: keep")
@@ -279,6 +279,19 @@ func (s *PRStep) Execute(sctx *pipeline.StepContext) (*pipeline.StepOutcome, err
 				// attestation is part of delivery, so CI must not run after a failed
 				// update while the existing body still binds the previous head.
 				return nil, fmt.Errorf("update existing pull request: %w", err)
+			}
+			if template != "" {
+				reader, ok := host.(scm.PRContentReader)
+				if !ok {
+					return nil, fmt.Errorf("provider cannot verify the regenerated body for %s", createdBodyOwner(template))
+				}
+				actual, err := reader.GetPRContent(ctx, existing)
+				if err != nil {
+					return nil, fmt.Errorf("verify regenerated PR for %s: %w", createdBodyOwner(template), err)
+				}
+				if actual.Body != content.Body {
+					return nil, fmt.Errorf("regenerated PR body differs from the proposed %s and evidence; refusing successful publication", createdBodyOwner(template))
+				}
 			}
 		}
 		if err := verifyClosingIssues(ctx, host, updated, sctx); err != nil {
@@ -518,11 +531,11 @@ func describePR(pr *scm.PR) string {
 // next rendering path somebody adds is not going to have one; a boundary scrub
 // covers sources nobody has written yet.
 func (s *PRStep) buildPRContent(sctx *pipeline.StepContext, branch, baseBranch, baseSHA string, provider scm.Provider, bodyLimit int) (prContent, error) {
-	if name := configuredPRTemplate(sctx); name != "" {
+	if prTemplateConfigured(sctx) {
 		if !supportsPRTemplates(provider) {
-			return prContent{}, fmt.Errorf("pr.template is unsupported by this provider")
+			return prContent{}, fmt.Errorf("pr.template and pr.user_template are unsupported by this provider")
 		}
-		template, err := loadPRTemplate(sctx.Ctx, sctx.WorkDir, sctx.Config.TrustedConfigSHA, name)
+		template, err := loadConfiguredPRTemplate(sctx.Ctx, sctx)
 		if err != nil {
 			return prContent{}, err
 		}
@@ -552,6 +565,18 @@ func (s *PRStep) buildPRContent(sctx *pipeline.StepContext, branch, baseBranch, 
 		return prContent{}, err
 	}
 	return redacted, nil
+}
+
+// regeneratesLegacyPRBody reports whether an open PR whose body carries an
+// unowned legacy attestation stays on the regenerate path. Only the operator's
+// machine-wide pr.user_template does that; a repository pr.template and
+// pr.update_text: keep still refuse to adopt such a body.
+func regeneratesLegacyPRBody(sctx *pipeline.StepContext, body string) bool {
+	if sctx.Config == nil || sctx.Config.PR.Template != "" || sctx.Config.PR.UserTemplate == "" || keepsPRUpdateText(sctx) {
+		return false
+	}
+	_, err := parsePROwnedBody(body)
+	return errors.Is(err, errUnownedLegacyAttestation)
 }
 
 // redactPRContent removes the run worktree paths, the operator's home

@@ -29,19 +29,31 @@ func validatePRSignature(mode string) error {
 // filesystem path, glob, ref expression or URL. Empty leaves template mode off.
 // Keep this platform-independent: a Windows spelling is unsafe on POSIX too.
 func ValidatePRTemplatePath(name string) error {
+	return validateLiteralRelativePath("pr.template", "repository-relative", name)
+}
+
+// ValidatePRUserTemplatePath accepts a literal path relative to the operator's
+// <NM_HOME>/pr-templates directory, with the same shape rules as pr.template:
+// no absolute path, no "..", no drive or backslash spelling. The step reads it
+// through an os.Root, which also refuses a symlink that escapes the directory.
+func ValidatePRUserTemplatePath(name string) error {
+	return validateLiteralRelativePath("pr.user_template", "pr-templates-relative", name)
+}
+
+func validateLiteralRelativePath(key, kind, name string) error {
 	if name == "" {
 		return nil
 	}
 	if len(name) > 1024 || strings.TrimSpace(name) != name || strings.HasPrefix(name, "/") || strings.HasPrefix(name, "-") || strings.ContainsAny(name, "\\:") || path.Clean(name) != name {
-		return fmt.Errorf("pr.template must be a literal repository-relative path")
+		return fmt.Errorf("%s must be a literal %s path", key, kind)
 	}
 	for _, part := range strings.Split(name, "/") {
 		if part == "." || part == ".." || part == ".git" || part == "" {
-			return fmt.Errorf("pr.template must not traverse directories or name .git")
+			return fmt.Errorf("%s must not traverse directories or name .git", key)
 		}
 	}
 	if strings.IndexFunc(name, unicode.IsControl) >= 0 {
-		return fmt.Errorf("pr.template must not contain control characters")
+		return fmt.Errorf("%s must not contain control characters", key)
 	}
 	return nil
 }

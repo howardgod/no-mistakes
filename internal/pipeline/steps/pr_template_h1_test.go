@@ -21,12 +21,12 @@ func TestPRTemplateStructureRequiresH1TextAndOrder(t *testing.T) {
 		"fenced":    "```markdown\n# Summary\n# Validation\n```",
 	} {
 		t.Run(name, func(t *testing.T) {
-			if err := validateTemplateStructure(template, body); err == nil {
+			if err := validateTemplateStructure(template, body, false); err == nil {
 				t.Fatal("invalid H1 structure accepted")
 			}
 		})
 	}
-	if err := validateTemplateStructure(template, "# Extra\n# Summary\nFilled.\n# Validation\nDone."); err != nil {
+	if err := validateTemplateStructure(template, "# Extra\n# Summary\nFilled.\n# Validation\nDone.", false); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -35,10 +35,10 @@ func TestPRTemplateStructureRecognizesOnlyTopLevelATXH1(t *testing.T) {
 	t.Parallel()
 	text := "# One\n  # Two ###\n#\n#\tTabbed\n## Two hashes\n### Three hashes\n#hashtag\n    # Indented code\n\t# Tab code\n> # Quoted\n- # List\nSetext\n======\n```markdown\n# Fenced\n```\n~~~\n# Tilde fenced\n~~~\n"
 	want := []string{"# One", "# Two ###", "#", "#\tTabbed"}
-	if got := templateStructureLines(text); !reflect.DeepEqual(got, want) {
+	if got := templateStructureLines(text, 1, false); !reflect.DeepEqual(got, want) {
 		t.Fatalf("H1s = %q, want %q", got, want)
 	}
-	if err := validateTemplateStructure("## Optional\n### Nested\n- [ ] Choice\n```\n# Example\n```", "Narrative only."); err != nil {
+	if err := validateTemplateStructure("## Optional\n### Nested\n- [ ] Choice\n```\n# Example\n```", "Narrative only.", false); err != nil {
 		t.Fatalf("no-H1 template rejected: %v", err)
 	}
 }
