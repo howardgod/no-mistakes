@@ -21,12 +21,12 @@ func TestPRTemplateStructureRequiresH1TextAndOrder(t *testing.T) {
 		"fenced":    "```markdown\n# Summary\n# Validation\n```",
 	} {
 		t.Run(name, func(t *testing.T) {
-			if err := validateTemplateStructure(template, body); err == nil {
+			if err := validateTemplateStructure(template, body, false); err == nil {
 				t.Fatal("invalid H1 structure accepted")
 			}
 		})
 	}
-	if err := validateTemplateStructure(template, "# Extra\n# Summary\nFilled.\n# Validation\nDone."); err != nil {
+	if err := validateTemplateStructure(template, "# Extra\n# Summary\nFilled.\n# Validation\nDone.", false); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -35,49 +35,11 @@ func TestPRTemplateStructureRecognizesOnlyTopLevelATXH1(t *testing.T) {
 	t.Parallel()
 	text := "# One\n  # Two ###\n#\n#\tTabbed\n## Two hashes\n### Three hashes\n#hashtag\n    # Indented code\n\t# Tab code\n> # Quoted\n- # List\nSetext\n======\n```markdown\n# Fenced\n```\n~~~\n# Tilde fenced\n~~~\n"
 	want := []string{"# One", "# Two ###", "#", "#\tTabbed"}
-	if got := templateStructureLines(text, 1); !reflect.DeepEqual(got, want) {
+	if got := templateStructureLines(text, 1, false); !reflect.DeepEqual(got, want) {
 		t.Fatalf("H1s = %q, want %q", got, want)
 	}
-	if got := templateHeadingLevel(text); got != 1 {
-		t.Fatalf("heading level = %d, want 1", got)
-	}
-	if err := validateTemplateStructure("Plain prose.\n- [ ] Choice\n```\n# Example\n```", "Narrative only."); err != nil {
-		t.Fatalf("heading-free template rejected: %v", err)
-	}
-}
-
-// A template whose sections start at ## (no # heading) keeps its ## headings
-// structurally required, the way a # template keeps its H1s; ### stays editable.
-func TestPRTemplateStructureUsesTheTemplatesHighestHeadingLevel(t *testing.T) {
-	t.Parallel()
-	template := "<!-- guidance -->\n## Summary\n## Cause\n### Facts the remedy relies on\n## Risk\n```markdown\n# Fenced example\n```\n"
-	if got := templateHeadingLevel(template); got != 2 {
-		t.Fatalf("heading level = %d, want 2 (the fenced # is not a heading)", got)
-	}
-	if err := validateTemplateStructure(template, "## Summary\n- s\n## Cause\n- c\n## Risk\n- Level: Low"); err != nil {
-		t.Fatalf("filled ## template rejected: %v", err)
-	}
-	for name, body := range map[string]string{
-		"missing":       "## Summary\n## Risk",
-		"changed":       "## Summary\n## Causes\n## Risk",
-		"reordered":     "## Cause\n## Summary\n## Risk",
-		"promoted":      "# Summary\n## Cause\n## Risk",
-		"demoted":       "## Summary\n### Cause\n## Risk",
-		"other headers": "# TL;DR\n# Changes",
-	} {
-		t.Run(name, func(t *testing.T) {
-			heading, missing := missingTemplateHeading(template, body)
-			if !missing {
-				t.Fatal("invalid ## structure accepted")
-			}
-			if err := validateTemplateStructure(template, body); err == nil || !strings.Contains(err.Error(), heading) {
-				t.Fatalf("error %v does not name the missing heading %q", err, heading)
-			}
-		})
-	}
-	// A # template still requires only its H1s; its ## headings stay editable.
-	if err := validateTemplateStructure("# TL;DR\n## Details\n# Testing\n", "# TL;DR\nx\n# Testing\ny"); err != nil {
-		t.Fatalf("# template with dropped ## rejected: %v", err)
+	if err := validateTemplateStructure("## Optional\n### Nested\n- [ ] Choice\n```\n# Example\n```", "Narrative only.", false); err != nil {
+		t.Fatalf("no-H1 template rejected: %v", err)
 	}
 }
 
@@ -89,7 +51,7 @@ func TestPRTemplateDraftAllowsSubordinateCompletion(t *testing.T) {
 		{"Chatwoot", "# Pull Request Template\n## Description\n## Type of change\nPlease delete options that are not relevant.\n- [ ] Bug fix\n- [ ] New feature\n## Checklist:\n- [ ] Maintainer approval",
 			"# Pull Request Template\n## Description\nFix the helper.\n## Type of change\n- [x] Bug fix\n## Checklist:\n- [ ] Maintainer approval"},
 		{"Forem", "## What type of PR is this?\n- [ ] Bug Fix\n## Added/updated tests?\n- [ ] Yes\n- [ ] No, and this is why: _please replace this line with details on why tests\n      have not been included_\n### UI accessibility checklist\n- [ ] Keyboard operation\n## [optional] GIF",
-			"## What type of PR is this?\n- [x] Bug Fix\n## Added/updated tests?\n- [x] No, and this is why: this is a prose-only correction.\n## [optional] GIF\nNone."},
+			"## What type of PR is this?\n- [x] Bug Fix\n## Added/updated tests?\n- [x] No, and this is why: this is a prose-only correction."},
 		{"OpenProject", "# Ticket\n# What are you trying to accomplish?\n## Screenshots\n<!-- Provide before/after screenshots for visual changes; otherwise, remove this section -->\n# What approach did you choose and why?\n# Merge checklist\n- [ ] Tested major browsers",
 			"# Ticket\nNo ticket supplied.\n# What are you trying to accomplish?\nCorrect prose; no visual changes.\n# What approach did you choose and why?\nEdit only the incorrect sentence.\n# Merge checklist\n- [ ] Tested major browsers"},
 	}
@@ -97,7 +59,7 @@ func TestPRTemplateDraftAllowsSubordinateCompletion(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sctx, ag, _ := templateTestContext(t)
 			ag.runFn = func(_ context.Context, opts agent.RunOpts) (*agent.Result, error) {
-				for _, rule := range []string{"headings are structurally required", "Make a best effort", "fill all applicable sections", "falsely claim human signoff", "mark human approval checkboxes complete"} {
+				for _, rule := range []string{"Only these H1 headings are structurally required", "Make a best effort", "fill all applicable sections", "falsely claim human signoff", "mark human approval checkboxes complete"} {
 					if !strings.Contains(opts.Prompt, rule) {
 						t.Errorf("missing drafting rule %q", rule)
 					}

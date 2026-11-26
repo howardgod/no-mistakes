@@ -92,9 +92,7 @@ func TestPRSignatureJourney(t *testing.T) {
 	startRun("feature/sig-default-minimal", "")
 	assertPlain("default, minimal appendix", publishedBody("feature/sig-default-minimal", "03-default-plain-minimal.md"))
 
-	// The template's top-level ## heading matches fakeagent's canned
-	// "## Summary" body, so the structural heading check passes.
-	h.CommitChange("main", ".github/pr_template.md", "## Summary\n\nDescribe the change.\n", "add PR template")
+	h.CommitChange("main", ".github/pr_template.md", "## Overview\n\nDescribe the change.\n", "add PR template")
 	setTrustedConfig("pr:\n  template: .github/pr_template.md\n  appendix: collapsed\n", "trusted template without pr.signature")
 	startRun("feature/sig-default-template", "")
 	templateBody := publishedBody("feature/sig-default-template", "04-default-plain-template-collapsed.md")

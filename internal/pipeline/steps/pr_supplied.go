@@ -123,8 +123,8 @@ func renderSuppliedPRTitle(sctx *pipeline.StepContext, title string) (string, er
 func (s *PRStep) buildSuppliedPRContent(sctx *pipeline.StepContext, branch, baseBranch, baseSHA, template string, provider scm.Provider, bodyLimit int) (prContent, error) {
 	body := suppliedPRBody(sctx)
 	if template != "" {
-		if heading, missing := missingTemplateHeading(template, body); missing {
-			return prContent{}, fmt.Errorf("supplied PR description must keep every pr.template top-level heading with the same text and order; %q is missing, changed or out of order", heading)
+		if heading, missing := missingTemplateHeading(template, body, usesPRUserTemplate(sctx)); missing {
+			return prContent{}, fmt.Errorf("supplied PR description must keep every %s with the same text and order; %q is missing, changed or out of order", templateHeadingLabel(usesPRUserTemplate(sctx)), heading)
 		}
 	}
 	var title string

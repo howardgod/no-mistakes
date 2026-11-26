@@ -203,7 +203,7 @@ func (s *PRStep) Execute(sctx *pipeline.StepContext) (*pipeline.StepOutcome, err
 		// Removing pr.template must not switch an already owned body back to
 		// destructive drafting. Its live author narrative still wins.
 		// update_text: keep uses that same path when no template is configured.
-		if template != "" || hasPRAppendixMarkers(live.Body) || keepsPRUpdateText(sctx) {
+		if (template != "" || hasPRAppendixMarkers(live.Body) || keepsPRUpdateText(sctx)) && !regeneratesLegacyPRBody(sctx, live.Body) {
 			if _, err := parsePROwnedBody(live.Body); err != nil {
 				if errors.Is(err, errUnownedLegacyAttestation) && template == "" && keepsPRUpdateText(sctx) {
 					return nil, fmt.Errorf("existing PR has an unowned legacy attestation; explicitly separate its generated evidence from the narrative once before using pr.update_text: keep")
@@ -552,6 +552,18 @@ func (s *PRStep) buildPRContent(sctx *pipeline.StepContext, branch, baseBranch, 
 		return prContent{}, err
 	}
 	return redacted, nil
+}
+
+// regeneratesLegacyPRBody reports whether an open PR whose body carries an
+// unowned legacy attestation stays on the regenerate path. Only the operator's
+// machine-wide pr.user_template does that; a repository pr.template and
+// pr.update_text: keep still refuse to adopt such a body.
+func regeneratesLegacyPRBody(sctx *pipeline.StepContext, body string) bool {
+	if sctx.Config == nil || sctx.Config.PR.Template != "" || sctx.Config.PR.UserTemplate == "" || keepsPRUpdateText(sctx) {
+		return false
+	}
+	_, err := parsePROwnedBody(body)
+	return errors.Is(err, errUnownedLegacyAttestation)
 }
 
 // redactPRContent removes the run worktree paths, the operator's home

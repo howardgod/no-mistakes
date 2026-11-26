@@ -417,19 +417,19 @@ func TestPRTemplateDraftFailureDoesNotFallBackOrPublish(t *testing.T) {
 func TestPRTemplateStructureAllowsTaskEdits(t *testing.T) {
 	t.Parallel()
 	for _, line := range []string{"- [ ]", "*\t[ ] Approval", "+   [x] Approval", "1. [ ] Approval", "2) [X] Approval"} {
-		template := "# Summary\n\n## Overview\n\n" + line + "\n"
-		body := "# Summary\n\n## Overview\n\nFilled narrative.\n\n" + line + "\n"
-		if err := validateTemplateStructure(template, body); err != nil {
+		template := "## Overview\n\n" + line + "\n"
+		body := "## Overview\n\nFilled narrative.\n\n" + line + "\n"
+		if err := validateTemplateStructure(template, body, false); err != nil {
 			t.Errorf("unchanged checklist %q rejected: %v", line, err)
 		}
 		changed := strings.ReplaceAll(body, "[ ]", "[x]")
 		if changed == body {
 			changed = strings.ReplaceAll(strings.ReplaceAll(body, "[x]", "[ ]"), "[X]", "[ ]")
 		}
-		if err := validateTemplateStructure(template, changed); err != nil {
+		if err := validateTemplateStructure(template, changed, false); err != nil {
 			t.Errorf("changed checklist state %q rejected: %v", line, err)
 		}
-		if err := validateTemplateStructure(template, "# Summary\n\nFilled narrative."); err != nil {
+		if err := validateTemplateStructure(template, "Filled narrative.", false); err != nil {
 			t.Errorf("omitted checklist/subheading %q rejected: %v", line, err)
 		}
 	}
@@ -540,17 +540,17 @@ func TestPRTemplateStructureInvalidBacktickFenceKeepsRequiredHeadings(t *testing
 	t.Parallel()
 	template := "``` `example`\n# First\n# Second\n"
 	for _, body := range []string{"# First\n# Second\n", template} {
-		if err := validateTemplateStructure(template, body); err != nil {
+		if err := validateTemplateStructure(template, body, false); err != nil {
 			t.Fatalf("preserved headings rejected: %v", err)
 		}
 	}
 	for _, body := range []string{"# First\n", "# Second\n# First\n"} {
-		if err := validateTemplateStructure(template, body); err == nil {
+		if err := validateTemplateStructure(template, body, false); err == nil {
 			t.Fatalf("missing or reordered required heading accepted: %q", body)
 		}
 	}
 	// Tilde fences allow backticks in their info strings.
-	if err := validateTemplateStructure("~~~ `example`\n# Example\n~~~\n# Required\n", "# Required\n"); err != nil {
+	if err := validateTemplateStructure("~~~ `example`\n# Example\n~~~\n# Required\n", "# Required\n", false); err != nil {
 		t.Fatalf("fenced example treated as required: %v", err)
 	}
 }
