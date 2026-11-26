@@ -1,9 +1,7 @@
 package config
 
 import (
-	"bytes"
 	"fmt"
-	"log/slog"
 	"strings"
 	"testing"
 )
@@ -66,48 +64,6 @@ func TestLoadRepo_PRAppendix(t *testing.T) {
 		if _, err := LoadRepoFromBytes([]byte("pr:\n  appendix: " + mode + "\n")); err == nil {
 			t.Fatalf("pr.appendix %q accepted", mode)
 		}
-	}
-}
-
-// TestLoadRepo_RetiredPRSignatureWarns pins that a repository config that
-// still sets the removed pr.signature key keeps loading, whatever value it
-// holds, and says once that the key has no effect.
-func TestLoadRepo_RetiredPRSignatureWarns(t *testing.T) {
-	for _, tc := range []struct {
-		name, yaml string
-		warns      bool
-	}{
-		{"link", "pr:\n  signature: link\n", true},
-		{"plain", "pr:\n  signature: plain\n", true},
-		{"formerly invalid", "pr:\n  signature: Plain\n", true},
-		{"empty", "pr:\n  signature: \"\"\n", true},
-		{"absent", "pr:\n  appendix: minimal\n", false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			prev := slog.Default()
-			slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
-			defer slog.SetDefault(prev)
-
-			repo, err := LoadRepoFromBytes([]byte(tc.yaml))
-			if err != nil {
-				t.Fatalf("load: %v", err)
-			}
-			logged := buf.String()
-			want := 0
-			if tc.warns {
-				want = 1
-			}
-			if got := strings.Count(logged, "pr.signature is deprecated"); got != want {
-				t.Fatalf("deprecation lines = %d, want %d: %s", got, want, logged)
-			}
-			if tc.warns && !strings.Contains(logged, "no effect") {
-				t.Fatalf("deprecation does not state the setting has no effect: %s", logged)
-			}
-			if got := Merge(DefaultGlobalConfig(), EffectiveRepoConfig(nil, repo, false)).PR.AppendixMode(); tc.name == "absent" && got != PRAppendixMinimal {
-				t.Fatalf("the rest of the pr block stopped loading: appendix %q", got)
-			}
-		})
 	}
 }
 

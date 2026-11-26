@@ -612,11 +612,6 @@ type PRRaw struct {
 	PublishIntent *bool       `yaml:"publish_intent"`
 	Appendix      string      `yaml:"appendix"`
 	Intent        PRIntentRaw `yaml:"intent"`
-	// RetiredSignature is the removed pr.signature key. The PR appendix no
-	// longer writes a signature line, so the key configures nothing; it is
-	// parsed only so a config that still sets it loads with a deprecation
-	// warning (warnRetiredPRSignature) instead of failing.
-	RetiredSignature *string `yaml:"signature"`
 	// TitleFormat controls PR title rendering when set. It is a non-executing
 	// repository convention and is therefore read from the pushed branch.
 	TitleFormat *string `yaml:"title_format"`
@@ -1524,14 +1519,6 @@ func warnRetiredJev(raw retiredJev) {
 	}
 	if raw.CandidateExcerptBytes != nil {
 		slog.Warn("jev.candidate_excerpt_bytes is deprecated: the jev review pre-brief was removed and this setting has no effect")
-	}
-}
-
-// warnRetiredPRSignature reports a pr.signature key that is still set. Any
-// value, including one the old link/plain validation refused, loads.
-func warnRetiredPRSignature(pr PRRaw) {
-	if pr.RetiredSignature != nil {
-		slog.Warn("pr.signature is deprecated: the PR appendix no longer writes a signature line and this setting has no effect")
 	}
 }
 
@@ -3353,7 +3340,6 @@ func parseRepoConfig(data []byte) (*RepoConfig, error) {
 	if err := validatePRRaw(cfg.PR); err != nil {
 		return nil, fmt.Errorf("parse repo config: %w", err)
 	}
-	warnRetiredPRSignature(cfg.PR)
 	if cfg.AutoFix.CI == nil {
 		cfg.AutoFix.CI = cfg.AutoFix.Babysit
 	}

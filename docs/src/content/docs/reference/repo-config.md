@@ -363,7 +363,7 @@ pr:
 
 Removed. The generated PR body no longer carries a signature line (`Updates from git push no-mistakes`, or its linked form) in any [appendix mode](#prappendix), for ordinary bodies and template appendices alike.
 
-A config that still sets `pr.signature` keeps loading, whatever the value: the daemon logs a deprecation warning and the key has no effect. An existing PR whose owned appendix still carries the line, linked or plain, is recognized and rewritten without it on the next push; the author text around the appendix is kept.
+A config that still sets `pr.signature` keeps loading, whatever the value, and the key has no effect. An existing PR whose owned appendix still carries the line, linked or plain, is recognized and rewritten without it on the next push; the author text around the appendix is kept.
 
 The bundled `require-no-mistakes` action still looks for the linked line; its [README](https://github.com/kunchenguid/no-mistakes/tree/main/.github/actions/require-no-mistakes) owns that check.
 
