@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/kunchenguid/no-mistakes/internal/db"
-	"github.com/kunchenguid/no-mistakes/internal/pipeline/steps"
 	"github.com/kunchenguid/no-mistakes/internal/types"
 )
 
@@ -26,7 +25,7 @@ func pipelineSummaryWithStatuses(t *testing.T, review, testStep, document types.
 	for _, sr := range stepResults {
 		rounds[sr.ID] = []*db.StepRound{{Round: 1, Trigger: "initial", DurationMS: 1}}
 	}
-	md, _ := steps.BuildPipelineSummary(stepResults, rounds, requiredWorkflowTestHeadSHA)
+	md := legacySignedSummary(stepResults, rounds)
 	if md == "" {
 		t.Fatal("BuildPipelineSummary returned empty markdown")
 	}

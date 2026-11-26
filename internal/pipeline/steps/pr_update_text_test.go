@@ -335,7 +335,7 @@ func assertKeptEvidence(t *testing.T, body, mode, riskLine string) {
 		t.Fatalf("appendix bounds missing:\n%s", body)
 	}
 	appendix := body[start:end]
-	if !strings.Contains(appendix, riskLine) || !strings.Contains(appendix, plainNoMistakesPRSignature) {
+	if !strings.Contains(appendix, riskLine) || strings.Contains(appendix, "git push no-mistakes") {
 		t.Fatalf("appendix evidence = %q", appendix)
 	}
 	if mode == config.PRAppendixMinimal {

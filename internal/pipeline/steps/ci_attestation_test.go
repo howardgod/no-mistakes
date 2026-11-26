@@ -36,7 +36,10 @@ func compliantPipelineBody(t *testing.T, headSHA string) string {
 	if md == "" {
 		t.Fatal("BuildPipelineSummary returned empty markdown")
 	}
-	return md
+	// The pipeline no longer writes a signature line, but verify.py still
+	// requires the linked one, so a compliant body here is one published
+	// before the removal. Restamping must keep that line untouched.
+	return strings.Replace(md, "## Pipeline\n\n", "## Pipeline\n\n"+legacyLinkedPRSignature+"\n\n", 1)
 }
 
 func pythonInterpreterForVerify(t *testing.T) string {

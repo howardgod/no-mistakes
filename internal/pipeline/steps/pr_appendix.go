@@ -16,15 +16,6 @@ const (
 	validationDetailsClose = "\n</details>"
 )
 
-// prSignature defaults to the plain line; only an explicit trusted
-// pr.signature: link writes the linked line.
-func prSignature(sctx *pipeline.StepContext) string {
-	if sctx != nil && sctx.Config != nil && sctx.Config.PR.Signature == config.PRSignatureLink {
-		return noMistakesPRSignature
-	}
-	return plainNoMistakesPRSignature
-}
-
 func appendixMode(sctx *pipeline.StepContext) string {
 	if sctx == nil || sctx.Config == nil {
 		return config.PRAppendixFull
@@ -37,7 +28,7 @@ func appendixMode(sctx *pipeline.StepContext) string {
 func appendixEvidence(sctx *pipeline.StepContext, flavor prBodyFlavor, risk, testing, pipeline string, provider scm.Provider) string {
 	switch appendixMode(sctx) {
 	case config.PRAppendixMinimal:
-		return minimalTail(sctx, risk, pipeline, provider)
+		return minimalTail(risk, pipeline, provider)
 	case config.PRAppendixCollapsed:
 		if flavor == prBodyHTML {
 			return wrapValidation(joinAppendixSections(risk, testing, pipeline, provider))
@@ -69,12 +60,12 @@ func wrapValidation(inner string) string {
 }
 
 // minimalTail is the one-line risk level plus the attestation the pipeline
-// section already carries. Ordinary Bitbucket descriptions carry no
-// attestation comment; this does not invent one. An owned Bitbucket body
-// carries that comment inside a text fence, and the fence is kept so the
-// marker stays visible there.
-func minimalTail(sctx *pipeline.StepContext, risk, pipelineMD string, provider scm.Provider) string {
-	return joinBlocks(oneLineRisk(neutralizeAttestationMarkers(provider, risk)), prSignature(sctx), carriedAttestation(pipelineMD))
+// section already carries, with no visible signature line. Ordinary
+// Bitbucket descriptions carry no attestation comment; this does not invent
+// one. An owned Bitbucket body carries that comment inside a text fence, and
+// the fence is kept so the marker stays visible there.
+func minimalTail(risk, pipelineMD string, provider scm.Provider) string {
+	return joinBlocks(oneLineRisk(neutralizeAttestationMarkers(provider, risk)), carriedAttestation(pipelineMD))
 }
 
 func oneLineRisk(risk string) string {
@@ -136,7 +127,7 @@ func assemblePRBody(sctx *pipeline.StepContext, whatChanged, riskLine, testingMD
 
 func assembleMinimalPRBody(sctx *pipeline.StepContext, whatChanged, riskLine, pipelineMD string, bodyLimit int, provider scm.Provider) string {
 	prefix := narrativeWithIntent(sctx, whatChanged)
-	tail := minimalTail(sctx, riskLine, pipelineMD, provider)
+	tail := minimalTail(riskLine, pipelineMD, provider)
 	full := joinBlocks(prefix, tail)
 	if bodyLimit <= 0 || scm.PRBodyLen(full) <= bodyLimit {
 		return full
@@ -172,7 +163,7 @@ func buildPRBodyWithin(body, riskLine, testingMD, pipelineMD string, sctx *pipel
 
 func buildMinimalPRBody(body, riskLine, pipelineMD string, sctx *pipeline.StepContext, maxBytes int, provider scm.Provider) string {
 	prefix := narrativeWithIntent(sctx, body)
-	tail := minimalTail(sctx, riskLine, pipelineMD, provider)
+	tail := minimalTail(riskLine, pipelineMD, provider)
 	full := joinBlocks(prefix, tail)
 	if len(full) <= maxBytes {
 		return full
