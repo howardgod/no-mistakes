@@ -12,6 +12,18 @@ import (
 
 const noMistakesSignature = "Updates from [git push no-mistakes](https://github.com/kunchenguid/no-mistakes)"
 
+// legacySignedSummary is BuildPipelineSummary with the linked signature line
+// restored. The pipeline no longer writes that line, but verify.py still
+// requires it, so a body the gate can pass is one published before the
+// removal.
+func legacySignedSummary(stepResults []*db.StepResult, rounds map[string][]*db.StepRound) string {
+	md, _ := steps.BuildPipelineSummary(stepResults, rounds, requiredWorkflowTestHeadSHA)
+	if md == "" {
+		return ""
+	}
+	return strings.Replace(md, "## Pipeline\n\n", "## Pipeline\n\n"+noMistakesSignature+"\n\n", 1)
+}
+
 func attestationBody(t *testing.T, payload map[string]any) string {
 	t.Helper()
 	raw, err := json.Marshal(payload)
@@ -40,7 +52,7 @@ func TestRequireActionRefusesApprovedOverFailureTestStepWithoutOptIn(t *testing.
 		{ID: "test", StepName: types.StepTest, Status: types.StepStatusCompleted, OverrideReason: &reason},
 		{ID: "document", StepName: types.StepDocument, Status: types.StepStatusCompleted},
 	}
-	body, _ := steps.BuildPipelineSummary(stepResults, nil, requiredWorkflowTestHeadSHA)
+	body := legacySignedSummary(stepResults, nil)
 	if !strings.Contains(body, `"override_reason"`) {
 		t.Fatalf("producer omitted override_reason:\n%s", body)
 	}

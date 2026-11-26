@@ -88,8 +88,8 @@ func TestPRStep_UpdatesExistingPR(t *testing.T) {
 	if !strings.Contains(ghLog, "--body") {
 		t.Errorf("expected the PR body in the gh api PATCH, got:\n%s", ghLog)
 	}
-	if !strings.Contains(ghLog, plainNoMistakesPRSignature) {
-		t.Errorf("expected updated PR body to include no-mistakes signature, got:\n%s", ghLog)
+	if !strings.Contains(ghLog, "## Pipeline") || strings.Contains(ghLog, "git push no-mistakes") {
+		t.Errorf("expected updated PR body to carry the Pipeline section without a signature, got:\n%s", ghLog)
 	}
 
 	// Verify PR URL was stored
@@ -1337,14 +1337,14 @@ func TestAssemblePRBody_RetainsAttestationWhenCoreExceedsAzureCap(t *testing.T) 
 	}
 	attestation := buildPipelineAttestation(steps, nil, testPipelineHeadSHA)
 	pipelineMD := pipelineMarkdownForTest(strings.Repeat("review detail 😀 ", 1000))
-	pipelineMD = strings.Replace(pipelineMD, noMistakesPRSignature+"\n\n", noMistakesPRSignature+"\n\n"+attestation+"\n\n", 1)
+	pipelineMD = strings.Replace(pipelineMD, "## Pipeline\n\n", "## Pipeline\n\n"+attestation+"\n\n", 1)
 
 	got := assemblePRBody(sctx, "## What Changed\n\n"+strings.Repeat("change 😀 ", 1000), strings.Repeat("risk 😀 ", 1000), "", pipelineMD, limit, scm.ProviderAzureDevOps)
 
 	if scm.PRBodyLen(got) > limit {
 		t.Fatalf("assembled body = %d units, want <= %d", scm.PRBodyLen(got), limit)
 	}
-	for _, want := range []string{"## Pipeline", noMistakesPRSignature, attestation} {
+	for _, want := range []string{"## Pipeline", attestation} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("budgeted body dropped required pipeline content %q:\n%s", want, got)
 		}
@@ -1477,7 +1477,7 @@ func TestAppendGeneratedSections_RetainsPipelineAttestationWhenTruncated(t *test
 	}
 	attestation := buildPipelineAttestation(steps, nil, testPipelineHeadSHA)
 	pipelineMD := pipelineMarkdownForTest(strings.Repeat("review round - "+strings.Repeat("x", 1000), 100))
-	pipelineMD = strings.Replace(pipelineMD, noMistakesPRSignature+"\n\n", noMistakesPRSignature+"\n\n"+attestation+"\n\n", 1)
+	pipelineMD = strings.Replace(pipelineMD, "## Pipeline\n\n", "## Pipeline\n\n"+attestation+"\n\n", 1)
 
 	got := appendGeneratedSections("## What Changed\n\n- summary", "", "", pipelineMD, scm.ProviderGitHub)
 
@@ -1495,7 +1495,7 @@ func TestAppendGeneratedSections_RetainsAttestationWhenEssentialSectionsOverflow
 	}
 	attestation := buildPipelineAttestation(steps, nil, testPipelineHeadSHA)
 	pipelineMD := pipelineMarkdownForTest("review round 001")
-	pipelineMD = strings.Replace(pipelineMD, noMistakesPRSignature+"\n\n", noMistakesPRSignature+"\n\n"+attestation+"\n\n", 1)
+	pipelineMD = strings.Replace(pipelineMD, "## Pipeline\n\n", "## Pipeline\n\n"+attestation+"\n\n", 1)
 
 	got := appendGeneratedSections(
 		"## What Changed\n\n"+strings.Repeat("change detail\n", 5000),
@@ -1506,7 +1506,7 @@ func TestAppendGeneratedSections_RetainsAttestationWhenEssentialSectionsOverflow
 	)
 
 	assertGitHubBodyLimitForTest(t, got)
-	for _, want := range []string{"## Pipeline", noMistakesPRSignature, attestation} {
+	for _, want := range []string{"## Pipeline", attestation} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("budgeted body dropped required pipeline content %q:\n%s", want, got)
 		}
@@ -2063,7 +2063,7 @@ func bitbucketPRDescriptionForTest(t *testing.T, raw string) string {
 
 func pipelineMarkdownForTest(rounds ...string) string {
 	var b strings.Builder
-	b.WriteString("## Pipeline\n\nUpdates from [git push no-mistakes](https://github.com/kunchenguid/no-mistakes)\n\n")
+	b.WriteString("## Pipeline\n\n")
 	b.WriteString("<details>\n")
 	b.WriteString("<summary>🔧 **Review** - update rounds</summary>\n\n")
 	for _, round := range rounds {
@@ -2076,7 +2076,7 @@ func pipelineMarkdownForTest(rounds ...string) string {
 
 func bitbucketPipelineMarkdownForTest(rounds ...string) string {
 	var b strings.Builder
-	b.WriteString("## Pipeline\n\nUpdates from [git push no-mistakes](https://github.com/kunchenguid/no-mistakes)\n\n")
+	b.WriteString("## Pipeline\n\n")
 	b.WriteString("### ✅ **Review** - passed\n\n")
 	for _, round := range rounds {
 		b.WriteString(round)
@@ -2982,7 +2982,7 @@ func TestPRAppendixModes_RenderBodies(t *testing.T) {
 		{StepName: types.StepDocument, Status: types.StepStatusCompleted},
 	}
 	attestation := buildPipelineAttestation(steps, nil, testPipelineHeadSHA)
-	pipelineMD := strings.Replace(pipelineMarkdownForTest("review round kept"), noMistakesPRSignature+"\n\n", noMistakesPRSignature+"\n\n"+attestation+"\n\n", 1)
+	pipelineMD := strings.Replace(pipelineMarkdownForTest("review round kept"), "## Pipeline\n\n", "## Pipeline\n\n"+attestation+"\n\n", 1)
 	foreign := pipelineAttestationCommentPrefix + `{"head_sha":"` + strings.Repeat("a", 40) + `","steps":[]}` + pipelineAttestationCommentClosingToken
 
 	render := func(t *testing.T, mode string, publishIntent bool, provider scm.Provider, riskLine, testingMD string) string {

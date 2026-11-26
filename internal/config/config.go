@@ -458,11 +458,11 @@ type RepoConfig struct {
 	// the pushed branch controls nothing that executes.
 	AllowRepoCommands bool `yaml:"allow_repo_commands"`
 	// PR carries pull-request settings. BaseBranch controls where a PR lands,
-	// Template, PublishIntent, Appendix, and Signature control trusted publication policy,
+	// Template, PublishIntent, and Appendix control trusted publication policy,
 	// and TitleFormat controls repository title convention. EffectiveRepoConfig
 	// keeps BaseBranch trusted-only unless the repository opts into pushed
 	// settings, leaves TitleFormat on the pushed branch, and keeps Template,
-	// PublishIntent, Appendix, and Signature trusted-only.
+	// PublishIntent, and Appendix trusted-only.
 	AutoFix AutoFixRaw `yaml:"auto_fix"`
 	CI      CIRaw      `yaml:"ci"`
 	// Rebase is gate-control: EffectiveRepoConfig keeps it trusted-only so a
@@ -605,15 +605,18 @@ type PRRaw struct {
 	// repository explicitly opts into pushed-branch settings with
 	// allow_repo_commands.
 	BaseBranch string `yaml:"base_branch"`
-	// Template, PublishIntent, Appendix, Signature, and Intent remain
-	// trusted-only even when allow_repo_commands is enabled. An empty Appendix
-	// inherits machine-local defaults, falling back to full; Signature is
-	// repository-only and empty means plain.
+	// Template, PublishIntent, Appendix, and Intent remain trusted-only even
+	// when allow_repo_commands is enabled. An empty Appendix inherits
+	// machine-local defaults, falling back to full.
 	Template      string      `yaml:"template"`
 	PublishIntent *bool       `yaml:"publish_intent"`
 	Appendix      string      `yaml:"appendix"`
-	Signature     string      `yaml:"signature"`
 	Intent        PRIntentRaw `yaml:"intent"`
+	// RetiredSignature is the removed pr.signature key. The PR appendix no
+	// longer writes a signature line, so the key configures nothing; it is
+	// parsed only so a config that still sets it loads with a deprecation
+	// warning (warnRetiredPRSignature) instead of failing.
+	RetiredSignature *string `yaml:"signature"`
 	// TitleFormat controls PR title rendering when set. It is a non-executing
 	// repository convention and is therefore read from the pushed branch.
 	TitleFormat *string `yaml:"title_format"`
@@ -1155,8 +1158,6 @@ type PR struct {
 	PublishIntent *bool
 	// Appendix is full, collapsed, or minimal. Empty preserves full.
 	Appendix string
-	// Signature is link or plain. Empty means plain.
-	Signature string
 	// UpdateText is keep or regenerate. Empty means regenerate. It is set only
 	// from a matching repository_overrides entry.
 	UpdateText  string
@@ -1523,6 +1524,14 @@ func warnRetiredJev(raw retiredJev) {
 	}
 	if raw.CandidateExcerptBytes != nil {
 		slog.Warn("jev.candidate_excerpt_bytes is deprecated: the jev review pre-brief was removed and this setting has no effect")
+	}
+}
+
+// warnRetiredPRSignature reports a pr.signature key that is still set. Any
+// value, including one the old link/plain validation refused, loads.
+func warnRetiredPRSignature(pr PRRaw) {
+	if pr.RetiredSignature != nil {
+		slog.Warn("pr.signature is deprecated: the PR appendix no longer writes a signature line and this setting has no effect")
 	}
 }
 
@@ -3344,6 +3353,7 @@ func parseRepoConfig(data []byte) (*RepoConfig, error) {
 	if err := validatePRRaw(cfg.PR); err != nil {
 		return nil, fmt.Errorf("parse repo config: %w", err)
 	}
+	warnRetiredPRSignature(cfg.PR)
 	if cfg.AutoFix.CI == nil {
 		cfg.AutoFix.CI = cfg.AutoFix.Babysit
 	}
@@ -3371,9 +3381,6 @@ func validatePRRaw(pr PRRaw) error {
 		}
 	}
 	if err := validatePRAppendix(pr.Appendix); err != nil {
-		return err
-	}
-	if err := validatePRSignature(pr.Signature); err != nil {
 		return err
 	}
 	if err := validatePRIntent(pr.Intent); err != nil {
@@ -3655,7 +3662,7 @@ func EffectiveRepoConfig(pushed, trusted *RepoConfig, allowRepoCommands bool) *R
 		// trusted-only unless the repository explicitly opts into pushed
 		// settings alongside commands and agent selection. TitleFormat is a
 		// non-executing convention and remains sourced from the pushed copy.
-		// pr.template, pr.publish_intent, pr.appendix, and pr.signature control
+		// pr.template, pr.publish_intent, and pr.appendix control
 		// public narrative policy, so they remain trusted-only regardless of
 		// the commands opt-in.
 		if !allowRepoCommands {
@@ -3664,7 +3671,6 @@ func EffectiveRepoConfig(pushed, trusted *RepoConfig, allowRepoCommands bool) *R
 		effective.PR.Template = trusted.PR.Template
 		effective.PR.PublishIntent = trusted.PR.PublishIntent
 		effective.PR.Appendix = trusted.PR.Appendix
-		effective.PR.Signature = trusted.PR.Signature
 		effective.PR.Intent = trusted.PR.Intent
 		effective.Intent.Check = trusted.Intent.Check
 	} else {
@@ -3688,7 +3694,6 @@ func EffectiveRepoConfig(pushed, trusted *RepoConfig, allowRepoCommands bool) *R
 		effective.PR.Template = ""
 		effective.PR.PublishIntent = nil
 		effective.PR.Appendix = ""
-		effective.PR.Signature = ""
 		effective.PR.Intent = PRIntentRaw{}
 		effective.Intent.Check = IntentCheckRaw{}
 	}
@@ -4353,7 +4358,6 @@ func merge(global *GlobalConfig, repo *RepoConfig, override *RepositoryOverride)
 		Intent:        PRIntent{Format: repo.PR.Intent.Format, Sections: append([]string(nil), repo.PR.Intent.Sections...)},
 		PublishIntent: repo.PR.PublishIntent,
 		Appendix:      repo.PR.Appendix,
-		Signature:     repo.PR.Signature,
 	}
 	if override != nil {
 		if override.PR.TitleFormat != nil {

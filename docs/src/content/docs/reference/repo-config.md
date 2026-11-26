@@ -9,7 +9,7 @@ Per-repo configuration lives in `.no-mistakes.yaml` at the root of your reposito
 `commands.*` and `gates[].command` execute arbitrary shell on the daemon host via `sh -c` / `cmd.exe /c`, and `agent` selects which process launches there (including ordered fallback lists, ACP aliases such as `cursor` and `devin`, and `acp:` targets) with the maintainer's credentials.
 To prevent a supply-chain attack where a contributor lands a hostile value on a gated branch, the daemon reads **`commands` and `agent` from your default branch** (e.g. `origin/main`) unless the operator explicitly authorizes another source in machine-local [`repository_overrides.trusted_config_branches`](/no-mistakes/reference/global-config/#repository_overrides) and starts this run with a matching `--base-branch`. It never selects the source from the pushed SHA; it reads the exact commit a fresh fetch resolved (so a stale tracking ref cannot serve a value the live source branch removed).
 This page calls that source the **trusted config branch**: the default branch, unless the run is pinned to an operator-opted-in branch.
-The daemon also reads `document.instructions`, `review.conversation`, `review.path_instructions`, `review.agent_timeout`, `review.max_fix_rounds`, `gates`, `auto_fix.gates`, `protected_paths`, `disable_project_settings`, `no_ci`, `ci.rerun_transient`, `ci.revalidate_repairs`, `ci.required_reviews`, `ci.review_bot_comments`, `ci.rebase_behind`, `ci.carry_review_on_replay`, `ci.release_after_checks_pass`, `ci.instructions`, `rebase.strategy`, `test.prepare`, `test.base_attribution`, `test.instructions`, `test.allow_approve_over_failure`, `test.evidence.branch`, `intent.check`, `pr.template`, `pr.publish_intent`, `pr.intent`, `pr.appendix`, and `pr.signature` only from that trusted copy.
+The daemon also reads `document.instructions`, `review.conversation`, `review.path_instructions`, `review.agent_timeout`, `review.max_fix_rounds`, `gates`, `auto_fix.gates`, `protected_paths`, `disable_project_settings`, `no_ci`, `ci.rerun_transient`, `ci.revalidate_repairs`, `ci.required_reviews`, `ci.review_bot_comments`, `ci.rebase_behind`, `ci.carry_review_on_replay`, `ci.release_after_checks_pass`, `ci.instructions`, `rebase.strategy`, `test.prepare`, `test.base_attribution`, `test.instructions`, `test.allow_approve_over_failure`, `test.evidence.branch`, `intent.check`, `pr.template`, `pr.publish_intent`, `pr.intent`, and `pr.appendix` only from that trusted copy.
 `pr.base_branch` comes from that trusted source as well, but unlike those fields it follows the same `allow_repo_commands: true` opt-in exception as `commands`/`agent` (see [`pr.base_branch`](#prbase_branch) below).
 If the selected source branch cannot be fetched and resolved to a readable commit, or its present `.no-mistakes.yaml` cannot be read and parsed, the run aborts before launching an agent. The pre-admission `intent.check` fetch of that source is the exception: if that fetch fails, intent checks are unavailable/off for that launch, a warning is logged, and the same failed result is reused by trusted-config loading without retrying.
 A readable source tree with no `.no-mistakes.yaml` is valid and uses defaults, not another branch's policy.
@@ -63,7 +63,7 @@ disable_project_settings: true
 
 # Optional PR settings.
 # base_branch is read from the trusted config branch.
-# template, publish_intent, intent, appendix, and signature are trusted publication policy.
+# template, publish_intent, intent, and appendix are trusted publication policy.
 # intent.check is also trusted and rejects or warns before agent work.
 # See pr.appendix below for presentation modes and inheritance.
 # title_format is a repository convention and is read from this branch.
@@ -75,7 +75,6 @@ pr:
   #   format: brief # raw (default) | brief
   #   sections: [why, scope, out_of_scope]
   # appendix: collapsed # full | collapsed | minimal
-  # signature: link # plain (default) | link
   # title_format: "{{.Branch}}: {{.Title}}"
 
 auto_fix:
@@ -173,7 +172,7 @@ Opt in to honoring the code-executing selection fields (`commands.{prepare,test,
 | Type | `bool` |
 | Default | `false` |
 
-This field is itself read **only from the trusted config branch copy** of `.no-mistakes.yaml`, never from the pushed SHA, so a contributor cannot self-enable it by setting it on a feature branch. By default the daemon reads `commands` and `agent` from the trusted config branch so a pushed SHA cannot inject shell or pick the launched agent on the daemon host. The PR-target exception is documented under [`pr.base_branch`](#prbase_branch); `pr.template`, `pr.publish_intent`, `pr.appendix`, `pr.signature`, and the other trusted-only fields listed above do not follow this opt-in. Leave this `false` for any repo that accepts contributions. Set it to `true` only for a single-developer environment where you trust every branch you push (for example, a personal repo gated by your own daemon).
+This field is itself read **only from the trusted config branch copy** of `.no-mistakes.yaml`, never from the pushed SHA, so a contributor cannot self-enable it by setting it on a feature branch. By default the daemon reads `commands` and `agent` from the trusted config branch so a pushed SHA cannot inject shell or pick the launched agent on the daemon host. The PR-target exception is documented under [`pr.base_branch`](#prbase_branch); `pr.template`, `pr.publish_intent`, `pr.appendix`, and the other trusted-only fields listed above do not follow this opt-in. Leave this `false` for any repo that accepts contributions. Set it to `true` only for a single-developer environment where you trust every branch you push (for example, a personal repo gated by your own daemon).
 
 ### disable_project_settings
 
@@ -336,7 +335,7 @@ This format structures the Intent section; it is not a general PR-body privacy f
 
 ### pr.appendix
 
-Choose how much of the generated Risk, Testing, and Pipeline tail is visible after the narrative. Intent publication stays under [`pr.publish_intent`](#prpublish_intent).
+Choose how much of the generated Risk, Testing, and Pipeline tail is visible after the narrative. Intent publication stays under [`pr.publish_intent`](#prpublish_intent). No mode writes a signature line.
 
 | | |
 | --- | --- |
@@ -362,27 +361,11 @@ pr:
 
 ### pr.signature
 
-Choose the generated PR body's signature line, independently of `pr.template` and `pr.appendix`.
+Removed. The generated PR body no longer carries a signature line (`Updates from git push no-mistakes`, or its linked form) in any [appendix mode](#prappendix), for ordinary bodies and template appendices alike.
 
-| | |
-| --- | --- |
-| Type | `string` |
-| Values | `link`, `plain` |
-| Default | `plain` (missing or empty also means `plain`) |
-| Trust | Trusted config branch only, regardless of `allow_repo_commands` |
+A config that still sets `pr.signature` keeps loading, whatever the value: the daemon logs a deprecation warning and the key has no effect. An existing PR whose owned appendix still carries the line, linked or plain, is recognized and rewritten without it on the next push; the author text around the appendix is kept.
 
-`plain` writes exactly `Updates from git push no-mistakes`, without a link to the no-mistakes project.
-
-`link` opts into the linked line: `Updates from [git push no-mistakes](https://github.com/kunchenguid/no-mistakes)`.
-
-Either mode applies to ordinary PR bodies and template appendices in all three appendix modes. It does not remove the signature, rewrite author text, or change the pipeline attestation.
-
-An unrecognized value fails config parsing. The bundled `require-no-mistakes` action requires the linked signature; repositories using that check must set `link`. This setting does not change the action.
-
-```yaml
-pr:
-  signature: link
-```
+The bundled `require-no-mistakes` action still looks for the linked line; its [README](https://github.com/kunchenguid/no-mistakes/tree/main/.github/actions/require-no-mistakes) owns that check.
 
 ### pr.title_format
 

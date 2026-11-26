@@ -930,7 +930,7 @@ func (s *PRStep) buildPipelineSectionFor(sctx *pipeline.StepContext, provider sc
 	if sctx.Config != nil {
 		policy.AllowTestCommandOverride = strings.TrimSpace(sctx.Config.Test.AllowApproveOverFailure)
 	}
-	pipelineMD, riskLine = buildPipelineSummaryFor(steps, rounds, sctx.Run.HeadSHA, provider, policy, prSignature(sctx))
+	pipelineMD, riskLine = buildPipelineSummaryFor(steps, rounds, sctx.Run.HeadSHA, provider, policy)
 	// The review conversation rides inside the Pipeline section as an ordinary
 	// `### ` group, so the existing body-budget logic can drop it whole rather
 	// than competing with the attestation it must never displace.
@@ -1304,17 +1304,13 @@ func splitPipelineSectionHeader(pipelineMD string) (string, string) {
 		return "", pipelineMD
 	}
 
-	rest := pipelineMD[len(heading):]
-	introEnd := strings.Index(rest, "\n\n")
-	if introEnd < 0 {
-		return heading, rest
-	}
-
-	headerEnd := len(heading) + introEnd + len("\n\n")
+	// The section has no signature line: it opens with the attestation, or
+	// with the first step on a provider whose skin carries none.
+	headerEnd := len(heading)
 	// The generated attestation is data, not an update detail. Keep it in the
 	// fixed header so PR-body truncation never drops the machine-readable
 	// snapshot while omitting older human-readable update rounds.
-	rest = pipelineMD[headerEnd:]
+	rest := pipelineMD[headerEnd:]
 	if strings.HasPrefix(rest, pipelineAttestationCommentPrefix) {
 		if end := strings.Index(rest, pipelineAttestationCommentClosingToken); end >= 0 {
 			headerEnd += end + len(pipelineAttestationCommentClosingToken)

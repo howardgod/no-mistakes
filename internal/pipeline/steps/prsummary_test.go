@@ -16,23 +16,6 @@ import (
 
 const testPipelineHeadSHA = "0123456789abcdef0123456789abcdef01234567"
 
-func TestBuildPipelineSummary_PlainSignaturePreservesEvidence(t *testing.T) {
-	t.Parallel()
-	steps := []*db.StepResult{{ID: "review", StepName: types.StepReview, Status: types.StepStatusCompleted}}
-	const linked = "Updates from [git push no-mistakes](https://github.com/kunchenguid/no-mistakes)"
-	const plain = "Updates from git push no-mistakes"
-	for _, provider := range []scm.Provider{scm.ProviderGitHub, scm.ProviderBitbucket} {
-		linkedMD, linkedRisk := BuildPipelineSummaryFor(steps, nil, testPipelineHeadSHA, provider)
-		if !strings.Contains(linkedMD, "\n"+linked+"\n") {
-			t.Fatalf("default signature changed:\n%s", linkedMD)
-		}
-		plainMD, plainRisk := buildPipelineSummaryFor(steps, nil, testPipelineHeadSHA, provider, pipelineAttestationPolicy{}, plain)
-		if want := strings.Replace(linkedMD, linked, plain, 1); plainMD != want || plainRisk != linkedRisk {
-			t.Fatalf("plain signature changed pipeline evidence:\n%s", plainMD)
-		}
-	}
-}
-
 func TestBuildPipelineSummary_AllClean(t *testing.T) {
 	t.Parallel()
 	steps := []*db.StepResult{
@@ -50,8 +33,8 @@ func TestBuildPipelineSummary_AllClean(t *testing.T) {
 	if !strings.Contains(md, "## Pipeline") {
 		t.Error("missing Pipeline heading")
 	}
-	if !strings.Contains(md, "[git push no-mistakes](https://github.com/kunchenguid/no-mistakes)") {
-		t.Errorf("expected linked tagline, got:\n%s", md)
+	if strings.Contains(md, "git push no-mistakes") {
+		t.Errorf("expected no signature line, got:\n%s", md)
 	}
 	if strings.Count(md, "<details>") != len(steps) {
 		t.Fatalf("expected one collapsible per step, got:\n%s", md)
@@ -89,8 +72,8 @@ func TestBuildPipelineSummary_BitbucketCloudOmitsHTMLAndAttestation(t *testing.T
 	if !strings.Contains(md, "## Pipeline") {
 		t.Fatal("missing Pipeline heading")
 	}
-	if !strings.Contains(md, noMistakesPRSignature) {
-		t.Fatalf("expected human signature, got:\n%s", md)
+	if strings.Contains(md, "git push no-mistakes") {
+		t.Fatalf("expected no signature line, got:\n%s", md)
 	}
 	for _, want := range []string{
 		"✅ **Review** - passed",
@@ -245,8 +228,8 @@ func TestBuildPipelineSummary_EmitsStructuredStepAttestation(t *testing.T) {
 		}
 	}
 
-	if signatureAt, attestationAt := strings.Index(got, noMistakesPRSignature), strings.Index(got, prefix); signatureAt < 0 || attestationAt < signatureAt {
-		t.Fatalf("attestation must follow the existing signature:\n%s", got)
+	if !strings.HasPrefix(got, "## Pipeline\n\n"+prefix) {
+		t.Fatalf("the attestation must open the Pipeline section:\n%s", got)
 	}
 }
 

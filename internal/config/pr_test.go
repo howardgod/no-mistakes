@@ -1,7 +1,9 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 )
@@ -9,12 +11,12 @@ import (
 func TestPRPublicationPolicyTrustedEvenWithCommandsOptIn(t *testing.T) {
 	t.Parallel()
 	no, yes := false, true
-	pushed := &RepoConfig{PR: PRRaw{BaseBranch: "feature-base", Template: "evil.md", PublishIntent: &yes, Appendix: PRAppendixMinimal, Signature: PRSignatureLink}}
-	trusted := &RepoConfig{PR: PRRaw{BaseBranch: "trusted-base", Template: ".github/pull_request_template.md", PublishIntent: &no, Appendix: PRAppendixCollapsed, Signature: PRSignaturePlain}}
+	pushed := &RepoConfig{PR: PRRaw{BaseBranch: "feature-base", Template: "evil.md", PublishIntent: &yes, Appendix: PRAppendixMinimal}}
+	trusted := &RepoConfig{PR: PRRaw{BaseBranch: "trusted-base", Template: ".github/pull_request_template.md", PublishIntent: &no, Appendix: PRAppendixCollapsed}}
 	for _, allow := range []bool{false, true} {
 		got := EffectiveRepoConfig(pushed, trusted, allow)
 		cfg := Merge(DefaultGlobalConfig(), got)
-		if cfg.PR.Template != trusted.PR.Template || cfg.PR.PublishesIntent() || cfg.PR.AppendixMode() != PRAppendixCollapsed || cfg.PR.Signature != PRSignaturePlain {
+		if cfg.PR.Template != trusted.PR.Template || cfg.PR.PublishesIntent() || cfg.PR.AppendixMode() != PRAppendixCollapsed {
 			t.Fatalf("allow=%v: pushed publication policy won: %+v", allow, cfg.PR)
 		}
 		wantBase := "trusted-base"
@@ -26,16 +28,16 @@ func TestPRPublicationPolicyTrustedEvenWithCommandsOptIn(t *testing.T) {
 		}
 		for _, absent := range []*RepoConfig{nil, {}} {
 			got = EffectiveRepoConfig(pushed, absent, allow)
-			if got.PR.Template != "" || got.PR.PublishIntent != nil || got.PR.Appendix != "" || got.PR.Signature != "" {
+			if got.PR.Template != "" || got.PR.PublishIntent != nil || got.PR.Appendix != "" {
 				t.Fatalf("allow=%v: absent trusted policy inherited pushed values: %+v", allow, got.PR)
 			}
 		}
 		got = EffectiveRepoConfig(nil, trusted, allow)
-		if got.PR.Template != trusted.PR.Template || got.PR.PublishIntent == nil || *got.PR.PublishIntent || got.PR.Appendix != PRAppendixCollapsed || got.PR.Signature != PRSignaturePlain {
+		if got.PR.Template != trusted.PR.Template || got.PR.PublishIntent == nil || *got.PR.PublishIntent || got.PR.Appendix != PRAppendixCollapsed {
 			t.Fatalf("allow=%v: trusted policy lost when pushed copy absent", allow)
 		}
 	}
-	if pushed.PR.Template != "evil.md" || !*pushed.PR.PublishIntent || pushed.PR.Appendix != PRAppendixMinimal || pushed.PR.Signature != PRSignatureLink {
+	if pushed.PR.Template != "evil.md" || !*pushed.PR.PublishIntent || pushed.PR.Appendix != PRAppendixMinimal {
 		t.Fatal("trust merge mutated caller input")
 	}
 }
@@ -67,26 +69,45 @@ func TestLoadRepo_PRAppendix(t *testing.T) {
 	}
 }
 
-func TestLoadRepo_PRSignature(t *testing.T) {
-	t.Parallel()
-	for _, mode := range []string{"", PRSignatureLink, PRSignaturePlain} {
-		repo, err := LoadRepoFromBytes([]byte(fmt.Sprintf("pr:\n  signature: %q\n", mode)))
-		if err != nil {
-			t.Fatalf("mode %q: %v", mode, err)
-		}
-		for _, allow := range []bool{false, true} {
-			pushed := &RepoConfig{PR: PRRaw{Signature: PRSignatureLink}}
-			effective := EffectiveRepoConfig(pushed, repo, allow)
-			if got := Merge(DefaultGlobalConfig(), effective).PR.Signature; got != mode {
-				t.Fatalf("mode %q, allow=%v resolved to %q", mode, allow, got)
+// TestLoadRepo_RetiredPRSignatureWarns pins that a repository config that
+// still sets the removed pr.signature key keeps loading, whatever value it
+// holds, and says once that the key has no effect.
+func TestLoadRepo_RetiredPRSignatureWarns(t *testing.T) {
+	for _, tc := range []struct {
+		name, yaml string
+		warns      bool
+	}{
+		{"link", "pr:\n  signature: link\n", true},
+		{"plain", "pr:\n  signature: plain\n", true},
+		{"formerly invalid", "pr:\n  signature: Plain\n", true},
+		{"empty", "pr:\n  signature: \"\"\n", true},
+		{"absent", "pr:\n  appendix: minimal\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			prev := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
+			defer slog.SetDefault(prev)
+
+			repo, err := LoadRepoFromBytes([]byte(tc.yaml))
+			if err != nil {
+				t.Fatalf("load: %v", err)
 			}
-		}
-	}
-	for _, mode := range []string{"none", "PLAIN", "off", " plain ", "plain\n"} {
-		_, err := LoadRepoFromBytes([]byte(fmt.Sprintf("pr:\n  signature: %q\n", mode)))
-		if err == nil || !strings.Contains(err.Error(), "pr.signature") {
-			t.Fatalf("pr.signature %q: want config error naming the key, got %v", mode, err)
-		}
+			logged := buf.String()
+			want := 0
+			if tc.warns {
+				want = 1
+			}
+			if got := strings.Count(logged, "pr.signature is deprecated"); got != want {
+				t.Fatalf("deprecation lines = %d, want %d: %s", got, want, logged)
+			}
+			if tc.warns && !strings.Contains(logged, "no effect") {
+				t.Fatalf("deprecation does not state the setting has no effect: %s", logged)
+			}
+			if got := Merge(DefaultGlobalConfig(), EffectiveRepoConfig(nil, repo, false)).PR.AppendixMode(); tc.name == "absent" && got != PRAppendixMinimal {
+				t.Fatalf("the rest of the pr block stopped loading: appendix %q", got)
+			}
+		})
 	}
 }
 
