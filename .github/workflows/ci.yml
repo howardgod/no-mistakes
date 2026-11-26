@@ -43,6 +43,11 @@ jobs:
             name: test (ubuntu-latest)
           - os: macos-latest
             name: test (macos-latest)
+            # internal/pipeline/steps alone takes 345-607s under -race on the
+            # macOS runner, which brushes go test's 10m default.
+            # GOFLAGS carries it so the `go test -race ./...` command itself
+            # stays identical on every Unix runner.
+            unix_goflags: -timeout=25m
           - os: windows-latest
             name: test (windows-core)
             shard: core
@@ -144,6 +149,8 @@ jobs:
 
       - name: Test on Unix
         if: runner.os != 'Windows'
+        env:
+          GOFLAGS: ${{ matrix.unix_goflags }}
         run: go test -race ./...
 
       # Git-heavy packages are the Windows wall floor. NM_CI_WINDOWS_GIT_EXCLUDE
