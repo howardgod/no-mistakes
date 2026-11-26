@@ -295,9 +295,11 @@ func templateHeadingLabel(user bool) string {
 }
 
 // This is a structural guard, not a Markdown/template interpreter. A drafting
-// failure must not silently replace the team's H1 text/order. Subordinate
-// completion is best effort, not an enforced policy. No H1s means no structural
-// requirements. Existing published narrative never goes through this check again.
+// failure must not silently replace the team's required heading text/order
+// (H1s for pr.template; the highest level used for pr.user_template, see
+// missingTemplateHeading). Subordinate completion is best effort, not an
+// enforced policy. No required headings means no structural requirements.
+// Existing published narrative never goes through this check again.
 func validateTemplateStructure(template, body string, user bool) error {
 	if heading, missing := missingTemplateHeading(template, body, user); missing {
 		return fmt.Errorf("agent changed, omitted or reordered the %s %q; refusing publication", templateHeadingLabel(user), heading)
