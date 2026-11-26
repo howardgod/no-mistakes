@@ -124,7 +124,7 @@ func (s *PRStep) buildSuppliedPRContent(sctx *pipeline.StepContext, branch, base
 	body := suppliedPRBody(sctx)
 	if template != "" {
 		if heading, missing := missingTemplateHeading(template, body); missing {
-			return prContent{}, fmt.Errorf("supplied PR description must keep every pr.template top-level # heading with the same text and order; %q is missing, changed or out of order", heading)
+			return prContent{}, fmt.Errorf("supplied PR description must keep every pr.template top-level heading with the same text and order; %q is missing, changed or out of order", heading)
 		}
 	}
 	var title string

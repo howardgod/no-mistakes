@@ -1310,7 +1310,22 @@ layer. The pushed branch cannot choose the appendix mode, even with
 All modes retain the pipeline attestation. See the repository
 [`pr.appendix`](/no-mistakes/reference/repo-config/#prappendix) reference for
 rendering behavior and provider caveats. Invalid modes fail config loading.
-`pr.template`, `pr.publish_intent`, and `pr.intent` are not machine-wide settings.
+The repository-relative `pr.template`, `pr.publish_intent`, and `pr.intent` are not machine-wide settings; [`pr.user_template`](#pruser_template) is the operator's own template.
+
+### pr.user_template
+
+The operator's own PR template, read at run time from this machine instead of from any repository:
+
+```yaml
+pr:
+  user_template: causal.md # a file under ~/.no-mistakes/pr-templates/
+```
+
+The value is a literal path relative to `<NM_HOME>/pr-templates/` (`~/.no-mistakes/pr-templates/` by default). no-mistakes never creates or writes that directory; the file is operator-owned input and is not committed anywhere.
+
+When set, it is the template every PR step on this machine fills, and it wins over a repository's trusted [`pr.template`](/no-mistakes/reference/repo-config/#prtemplate) and a matching `repository_overrides` `pr.template`, both when the PR is created and when an existing PR with an empty description is filled. It also turns template mode on for repositories that configure no template, so the [author-preserving update rules](/no-mistakes/reference/repo-config/#author-preserving-regeneration) apply to every open PR the step updates: an existing narrative is kept and only the appendix is refreshed, and an open PR whose description carries an unowned attestation from an earlier non-template run fails the PR step until its generated evidence is separated by hand, exactly as when a repository first enables `pr.template`. When it is unset, the repository's `pr.template` applies exactly as before. Everything else about template mode is the repository setting's: the drafting rules, the structural heading check (the template's highest heading level present, so a template whose sections start at `##` keeps those `##` headings), the owned appendix, and author-preserving updates. A provider without a raw content contract rejects it the same way.
+
+An absolute path, `..`, `.`, `.git`, a backslash or drive spelling, or control characters fail config loading. The file is opened through the directory itself, so a symlink that resolves outside `<NM_HOME>/pr-templates/` is refused; a symlink inside it is followed. The file gets the same content checks as a repository template: 1 byte to 16 KiB, nonempty UTF-8 without NUL bytes, and no reserved no-mistakes publication markers. A set value whose file is missing, not a regular file, or fails those checks fails the PR step with an error naming the file; it never falls back to the repository's template. Only the global config can set this key: a repository `.no-mistakes.yaml` and `repository_overrides` cannot name it.
 
 ### repository_overrides
 
@@ -1357,8 +1372,8 @@ repository_overrides:
 `pr.template` selects a repository-relative file, never local template contents. It uses the same [path and file validation](/no-mistakes/reference/repo-config/#prtemplate) as the repository setting, and its bytes are read only from the pinned trusted config branch tree, never from the pushed branch or worktree.
 `pr.appendix` accepts `full`, `collapsed`, or `minimal` and can be set with or without `pr.template`; it uses the same [appendix and attestation behavior](/no-mistakes/reference/repo-config/#prappendix) as the repository setting. When template mode is active, author-edited narrative is preserved on later updates.
 `pr.update_text` accepts `keep` or `regenerate`. The default is `regenerate`, also used when the key is absent. `regenerate` replaces the title and body on update, as today, but only while the live body carries no owned appendix markers. Once `keep` has created or updated a PR, that PR keeps its title and narrative even after the key changes back to `regenerate` or is removed, the same rule that stops removing `pr.template` from switching an owned body back. `keep` leaves the live title unchanged and keeps the narrative above the appendix byte for byte, the same preservation [`pr.template`](/no-mistakes/reference/repo-config/#prtemplate) already uses, including when that repository has no template file. The step still creates the pull request when none exists: the ordinary drafter supplies the title and narrative, and the evidence is stored as that owned appendix. Every later update refreshes the appendix, or the `minimal` risk line, and the attestation, so they match the current head. If that narrative and the evidence cannot fit the publication budget, the step fails instead of truncating them. A configured `pr.title_format` still redrafts the bare title. A description supplied with [`axi run --pr-body-file`](/no-mistakes/reference/cli/#supplied-pr-title-and-description) is published as that same owned narrative whatever this key says, so `regenerate` keeps it too. An existing body that already carries an unowned attestation is refused until that generated evidence is separated from the narrative, the same adoption rule as template mode. To prepare an already open PR that an earlier `regenerate` run published, move its generated evidence out of the body by hand once before enabling `keep`. Any other value fails config loading. A repository `.no-mistakes.yaml` cannot set this key, and it is not a machine-wide `pr` setting.
-For `pr.template`, a non-empty trusted repository value wins over the matching machine-local value. For appendix inheritance, see [`pr.appendix` precedence](#prappendix).
-`pr.template` is available only under `repository_overrides`, not as a machine-wide PR setting. `pr.publish_intent`, `pr.intent`, and `pr.signature` remain trusted-repository-only.
+For `pr.template`, a non-empty trusted repository value wins over the matching machine-local value, and a global [`pr.user_template`](#pruser_template) wins over both. For appendix inheritance, see [`pr.appendix` precedence](#prappendix).
+The repository-relative `pr.template` is available only under `repository_overrides`, not as a machine-wide PR setting; the machine-wide template is [`pr.user_template`](#pruser_template). `pr.publish_intent`, `pr.intent`, and `pr.signature` remain trusted-repository-only.
 
 #### Machine-local review, documentation, and test guidance
 

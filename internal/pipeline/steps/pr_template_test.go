@@ -417,8 +417,8 @@ func TestPRTemplateDraftFailureDoesNotFallBackOrPublish(t *testing.T) {
 func TestPRTemplateStructureAllowsTaskEdits(t *testing.T) {
 	t.Parallel()
 	for _, line := range []string{"- [ ]", "*\t[ ] Approval", "+   [x] Approval", "1. [ ] Approval", "2) [X] Approval"} {
-		template := "## Overview\n\n" + line + "\n"
-		body := "## Overview\n\nFilled narrative.\n\n" + line + "\n"
+		template := "# Summary\n\n## Overview\n\n" + line + "\n"
+		body := "# Summary\n\n## Overview\n\nFilled narrative.\n\n" + line + "\n"
 		if err := validateTemplateStructure(template, body); err != nil {
 			t.Errorf("unchanged checklist %q rejected: %v", line, err)
 		}
@@ -429,7 +429,7 @@ func TestPRTemplateStructureAllowsTaskEdits(t *testing.T) {
 		if err := validateTemplateStructure(template, changed); err != nil {
 			t.Errorf("changed checklist state %q rejected: %v", line, err)
 		}
-		if err := validateTemplateStructure(template, "Filled narrative."); err != nil {
+		if err := validateTemplateStructure(template, "# Summary\n\nFilled narrative."); err != nil {
 			t.Errorf("omitted checklist/subheading %q rejected: %v", line, err)
 		}
 	}

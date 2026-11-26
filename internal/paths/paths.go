@@ -222,6 +222,11 @@ func (p *Paths) WorktreeDir(repoID, runID string) string {
 }
 
 func (p *Paths) LogsDir() string { return filepath.Join(p.root, "logs") }
+
+// PRTemplatesDir holds the operator's own PR templates. The global
+// pr.user_template key names a file relative to it; nothing in it is created
+// or managed by no-mistakes.
+func (p *Paths) PRTemplatesDir() string { return filepath.Join(p.root, "pr-templates") }
 func (p *Paths) RunLogDir(runID string) string {
 	return filepath.Join(p.root, "logs", runID)
 }

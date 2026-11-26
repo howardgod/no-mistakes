@@ -233,3 +233,33 @@ func TestMerge_DefaultPRTitleFormatIsEmpty(t *testing.T) {
 		t.Fatalf("PR.TitleFormat = %q, want empty default", cfg.PR.TitleFormat)
 	}
 }
+
+// pr.user_template is the operator's own global key: it parses and is
+// validated only from the global config, reaches the resolved PR config, and a
+// repository config (pushed or trusted) cannot name it at all.
+func TestPRUserTemplateIsGlobalOnly(t *testing.T) {
+	t.Parallel()
+	global, err := LoadGlobalFromBytes([]byte("pr:\n  user_template: causal/pr-template.md\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	trusted := &RepoConfig{PR: PRRaw{Template: ".github/pull_request_template.md"}}
+	cfg := Merge(global, EffectiveRepoConfig(nil, trusted, false))
+	if cfg.PR.UserTemplate != "causal/pr-template.md" || cfg.PR.Template != trusted.PR.Template {
+		t.Fatalf("resolved PR = %+v, want both templates carried", cfg.PR)
+	}
+	if cfg := Merge(DefaultGlobalConfig(), trusted); cfg.PR.UserTemplate != "" {
+		t.Fatalf("default global config set a user template: %q", cfg.PR.UserTemplate)
+	}
+	for _, name := range []string{"/home/me/causal.md", "../causal.md", "a/../b.md", "./causal.md", `C:\causal.md`, `a\b.md`, "a//b.md", " causal.md", "-causal.md"} {
+		if _, err := LoadGlobalFromBytes([]byte(fmt.Sprintf("pr:\n  user_template: %q\n", name))); err == nil || !strings.Contains(err.Error(), "pr.user_template") {
+			t.Errorf("%q: err = %v, want a pr.user_template refusal", name, err)
+		}
+	}
+	repo, err := LoadRepoFromBytes([]byte("pr:\n  user_template: causal.md\n"))
+	if err == nil {
+		if cfg := Merge(DefaultGlobalConfig(), repo); cfg.PR.UserTemplate != "" {
+			t.Fatalf("repository config set pr.user_template: %q", cfg.PR.UserTemplate)
+		}
+	}
+}

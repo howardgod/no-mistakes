@@ -155,12 +155,12 @@ func (s *PRStep) Execute(sctx *pipeline.StepContext) (*pipeline.StepOutcome, err
 	// Capture live author content before model drafting. An unreadable
 	// provider cannot promise template preservation.
 	var template string
-	if name := configuredPRTemplate(sctx); name != "" {
+	if prTemplateConfigured(sctx) {
 		if _, ok := host.(scm.PRContentReader); !ok {
-			return nil, fmt.Errorf("pr.template requires raw PR content reads; this provider is unsupported")
+			return nil, fmt.Errorf("pr.template and pr.user_template require raw PR content reads; this provider is unsupported")
 		}
 		var err error
-		template, err = loadPRTemplate(ctx, sctx.WorkDir, sctx.Config.TrustedConfigSHA, name)
+		template, err = loadConfiguredPRTemplate(ctx, sctx)
 		if err != nil {
 			return nil, err
 		}
@@ -518,11 +518,11 @@ func describePR(pr *scm.PR) string {
 // next rendering path somebody adds is not going to have one; a boundary scrub
 // covers sources nobody has written yet.
 func (s *PRStep) buildPRContent(sctx *pipeline.StepContext, branch, baseBranch, baseSHA string, provider scm.Provider, bodyLimit int) (prContent, error) {
-	if name := configuredPRTemplate(sctx); name != "" {
+	if prTemplateConfigured(sctx) {
 		if !supportsPRTemplates(provider) {
-			return prContent{}, fmt.Errorf("pr.template is unsupported by this provider")
+			return prContent{}, fmt.Errorf("pr.template and pr.user_template are unsupported by this provider")
 		}
-		template, err := loadPRTemplate(sctx.Ctx, sctx.WorkDir, sctx.Config.TrustedConfigSHA, name)
+		template, err := loadConfiguredPRTemplate(sctx.Ctx, sctx)
 		if err != nil {
 			return prContent{}, err
 		}

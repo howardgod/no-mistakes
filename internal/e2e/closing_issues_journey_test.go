@@ -433,7 +433,9 @@ func TestClosingIssueRefsNonGitHubFailsAtPR(t *testing.T) {
 func TestClosingIssueRefsOwnedTemplateJourney(t *testing.T) {
 	h := NewHarness(t, SetupOpts{Agent: "claude"})
 	statePath := setupStatefulGitHub(t, h)
-	h.CommitChange("main", ".github/pr_template.md", "## Overview\n\nDescribe the change.\n", "add PR template")
+	// The template's top-level ## heading matches fakeagent's canned
+	// "## Summary" body, so the structural heading check passes.
+	h.CommitChange("main", ".github/pr_template.md", "## Summary\n\nDescribe the change.\n", "add PR template")
 	h.CommitChange("main", ".no-mistakes.yaml", "no_ci: true\npr:\n  template: .github/pr_template.md\n", "configure PR template")
 	if out, err := h.runGit(t.Context(), h.WorkDir, "push", "origin", "main"); err != nil {
 		t.Fatalf("push main: %v\n%s", err, out)
