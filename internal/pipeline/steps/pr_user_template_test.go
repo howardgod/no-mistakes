@@ -279,3 +279,24 @@ func TestPRUserTemplateRegeneratesALegacyOpenPR(t *testing.T) {
 		})
 	}
 }
+
+// A regenerated legacy PR body is owned, so a write the forge does not settle
+// must fail the step instead of surfacing as a malformed appendix next run.
+func TestPRUserTemplateLegacyRegenerationVerifiesTheWrite(t *testing.T) {
+	userTemplateHome(t, map[string]string{"causal.md": testUserPRTemplate})
+	legacy := "## What Changed\n\n- old narrative\n\n<!-- no-mistakes-pipeline-attestation:v1 {\"head_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"steps\":[]} -->\n"
+	sctx, ag, _ := templateTestContext(t)
+	sctx.Config.PR.Template = ""
+	sctx.Config.PR.UserTemplate = "causal.md"
+	ag.runFn = func(_ context.Context, opts agent.RunOpts) (*agent.Result, error) {
+		data, _ := json.Marshal(prContent{Title: "feat(pipeline): fill user template", Body: filledUserPRTemplate})
+		return &agent.Result{Output: data}, nil
+	}
+	stale, _ := json.Marshal(map[string]string{"title": "old", "body": legacy})
+	env, _ := fakeGH(t, "https://github.com/test/repo/pull/42")
+	sctx.Env = append(env, "FAKE_CLI_PR_CONTENT_JSON="+string(stale))
+	_, err := (&PRStep{}).Execute(sctx)
+	if err == nil || !strings.Contains(err.Error(), "refusing successful publication") {
+		t.Fatalf("error = %v, want an unsettled regeneration refused", err)
+	}
+}

@@ -280,6 +280,19 @@ func (s *PRStep) Execute(sctx *pipeline.StepContext) (*pipeline.StepOutcome, err
 				// update while the existing body still binds the previous head.
 				return nil, fmt.Errorf("update existing pull request: %w", err)
 			}
+			if template != "" {
+				reader, ok := host.(scm.PRContentReader)
+				if !ok {
+					return nil, fmt.Errorf("provider cannot verify the regenerated body for %s", createdBodyOwner(template))
+				}
+				actual, err := reader.GetPRContent(ctx, existing)
+				if err != nil {
+					return nil, fmt.Errorf("verify regenerated PR for %s: %w", createdBodyOwner(template), err)
+				}
+				if actual.Body != content.Body {
+					return nil, fmt.Errorf("regenerated PR body differs from the proposed %s and evidence; refusing successful publication", createdBodyOwner(template))
+				}
+			}
 		}
 		if err := verifyClosingIssues(ctx, host, updated, sctx); err != nil {
 			return nil, err
