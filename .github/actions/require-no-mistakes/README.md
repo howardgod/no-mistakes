@@ -145,11 +145,11 @@ of scope for this action.
 
 ## Rollout
 
-This repository's own gate (`.github/workflows/no-mistakes-required.yml`) is a
-thin caller of this action, pinned to the commit that first published it. GitHub
-downloads `uses:` actions at job setup, so the pin must always name a ref that
-already carries the action; a caller pinned to a tag that predates it fails
-closed on every pull request.
+This describes the upstream repository's gate; this fork has no caller workflow.
+Upstream's gate is a thin caller of this action, pinned to the commit that first
+published it. GitHub downloads `uses:` actions at job setup, so the pin must
+always name a ref that already carries the action; a caller pinned to a tag that
+predates it fails closed on every pull request.
 
 Pinning the gate to an already-published commit is the self-certification guard.
 A pull request that edits this action is fully **tested** on its own head - the
